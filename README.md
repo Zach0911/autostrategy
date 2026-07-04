@@ -11,18 +11,40 @@
 ## 快速开始（产品版）
 
 ```bash
-# 安装
+# 安装开发版
 pip install -e .
 
-# 初始化配置
+# 初始化本地配置，会创建 ~/.autostrategy/settings.yaml
 autostrategy config init
 
-# 查看版本
-autostrategy --version
+# 配置 LLM。API key 不写入配置文件，只从环境变量读取
+autostrategy config set llm.provider openai
+autostrategy config set llm.model gpt-4o-mini
+export AUTOSTRATEGY_LLM_API_KEY="你的 API Key"
 
-# 查看策略列表
-autostrategy strategy list
+# 创建策略工作区
+autostrategy strategy create dual-ma --template dual-ma
+
+# 查看策略路径
+autostrategy strategy paths dual-ma
+
+# 用自然语言生成 STRATEGY_DESIGN.md，需要已配置 LLM key
+autostrategy design create \
+  --prompt "帮我做一个 A 股双均线策略" \
+  --name dual-ma \
+  --template dual-ma
+
+# 从 STRATEGY_DESIGN.md 生成 strategy.py/config.yaml/README.md 等文件
+autostrategy codegen create dual-ma --force
+
+# 执行本地回测并生成 backtest/results/backtest_result.json
+autostrategy backtest run dual-ma
+
+# 查看策略状态，应从 draft/designed/coded 流转到 backtested
+autostrategy strategy show dual-ma
 ```
+
+> `design create` 和 `codegen create` 会调用用户自己配置的 LLM Provider。开源项目不会内置 API key，也不会替用户付费。
 
 ## 它能做什么？
 
@@ -114,24 +136,30 @@ pip install numpy pandas pyyaml
 
 ```
 autostrategy/
-├── SKILL.md                          # 调度台：入口分流 + Agent 编排 + 审批点控制
-├── prompts/
-│   ├── design_agent.md               # Phase 1：策略设计 Agent 指令
-│   ├── codegen_agent.md              # Phase 2：代码生成 Agent 指令
-│   └── optimization_agent.md         # Phase 3：自主优化 Agent 指令
+├── pyproject.toml                     # Python 包定义与 CLI 入口
+├── SKILL.md                           # 兼容旧 Skill 安装路径的 shim
+├── src/autostrategy/
+│   ├── cli/main.py                    # Typer CLI
+│   ├── config.py                      # 本地配置与 LLM Provider 配置
+│   ├── llm/client.py                  # OpenAI-compatible LLM Client
+│   ├── agents/
+│   │   ├── design_agent.py            # 自然语言 → STRATEGY_DESIGN.md
+│   │   └── codegen_agent.py           # STRATEGY_DESIGN.md → strategy.py/config/README
+│   ├── core/
+│   │   ├── strategy.py                # Strategy 领域模型与状态
+│   │   ├── workspace.py               # 策略工作区 CRUD 与文件 API
+│   │   ├── template_registry.py       # 内置模板市场
+│   │   └── backtest_engine.py         # 可导入的产品化回测引擎
+│   └── templates/                     # dual-ma / grid / momentum 模板
+├── .claude/skills/autostrategy/       # Claude Code Skill 兼容层
+│   └── prompts/                       # 原 Skill prompts
 ├── scripts/
-│   ├── env_setup.py                  # 环境检查与依赖安装
-│   ├── quality_check.py              # 策略设计文档质量检查
-│   └── run_backtest.py               # 回测执行与评分
+│   ├── env_setup.py                   # 环境检查与依赖安装
+│   ├── quality_check.py               # 旧版策略设计文档质量检查
+│   └── run_backtest.py                # 兼容脚本入口
 ├── examples/
-│   └── dynamic-grid-multi-market/    # 示例：动态网格多标的策略
-│       ├── STRATEGY_DESIGN.md
-│       ├── config.yaml
-│       ├── strategy.py
-│       ├── requirements.txt
-│       └── data/
-│           └── fetch_data.py
-└── skills-lock.json
+│   └── dynamic-grid-multi-market/     # 示例：动态网格多标的策略
+└── tests/                             # unit / integration 测试
 ```
 
 ## 示例策略
@@ -156,9 +184,13 @@ autostrategy/
 
 ## 技术栈
 
-- **语言**：Python 3.9+
+- **语言**：Python 3.11+
+- **CLI**：Typer
+- **配置/数据模型**：Pydantic + PyYAML
 - **数据处理**：NumPy, Pandas
-- **数据源**：[FTShare](https://github.com/rivar0107/all-in-one)（A股）、FutuAPI（港美股）
+- **回测**：函数式 `run_backtest(config)` 优先，兼容 Backtrader Strategy class
+- **数据源**：[FTShare](https://github.com/rivar0107/all-in-one)（A股）、FutuAPI（港美股）、akshare/yfinance 等可扩展源
+- **LLM Provider**：OpenAI-compatible，本地读取用户环境变量中的 API key
 - **AI Agent 兼容**：Claude Code, Gemini CLI, Copilot CLI, Codex, Cline 等
 
 ## 相关项目
