@@ -5,7 +5,8 @@ from pathlib import Path
 import typer
 
 from autostrategy import __version__
-from autostrategy.config import init_settings, load_settings
+from autostrategy.agents.design_agent import DesignAgent
+from autostrategy.config import init_settings, load_settings, save_settings
 from autostrategy.core.template_registry import TemplateRegistry
 from autostrategy.core.workspace import Workspace
 
@@ -56,6 +57,22 @@ def config_show() -> None:
     typer.echo(f"Version: {settings.version}")
     typer.echo(f"LLM provider: {settings.llm.provider}")
     typer.echo(f"LLM model: {settings.llm.model}")
+
+
+@config_app.command("set")
+def config_set(
+    key: str = typer.Argument(..., help="Setting key, e.g. llm.provider"),
+    value: str = typer.Argument(..., help="Setting value"),
+) -> None:
+    """Set a configuration value."""
+    settings = load_settings()
+    parts = key.split(".")
+    current = settings
+    for part in parts[:-1]:
+        current = getattr(current, part)
+    setattr(current, parts[-1], value)
+    save_settings(settings)
+    typer.echo(f"Set {key} = {value}")
 
 
 strategy_app = typer.Typer(help="Manage trading strategies.")
@@ -152,6 +169,39 @@ def strategy_delete(
             raise typer.Exit(0)
     workspace.delete_strategy(slug)
     typer.echo(f"Strategy '{slug}' deleted.")
+
+
+design_app = typer.Typer(help="Design a trading strategy with AI.")
+app.add_typer(design_app, name="design")
+
+
+@design_app.command("create")
+def design_create(
+    prompt: str = typer.Option(..., "--prompt", "-p", help="Strategy idea in natural language."),
+    name: str = typer.Option(..., "--name", "-n", help="Strategy name."),
+    market: str = typer.Option("A股", "--market", "-m", help="Target market."),
+    template: str | None = typer.Option(None, "--template", "-t", help="Template name."),
+    workspace_root: str | None = typer.Option(
+        None, "--workspace-root", help="Workspace root directory."
+    ),
+) -> None:
+    """Generate a strategy design from a natural language prompt."""
+    settings = load_settings()
+    agent = DesignAgent(llm_config=settings.llm)
+    workspace = Workspace(root=_workspace_root_option(workspace_root))
+    try:
+        strategy = agent.design_and_save(
+            workspace=workspace,
+            name=name,
+            prompt=prompt,
+            market=market,
+            template=template,
+        )
+        typer.echo(f"Strategy '{strategy.name}' designed at {strategy.workspace_dir}")
+        typer.echo(f"Design saved to {strategy.workspace_dir / 'STRATEGY_DESIGN.md'}")
+    except ValueError as e:
+        typer.echo(f"Error: {e}")
+        raise typer.Exit(1)
 
 
 if __name__ == "__main__":
