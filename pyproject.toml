@@ -40,14 +40,18 @@ data = [
     "akshare>=1.14.0",
     "yfinance>=0.2.0",
 ]
+llm = [
+    "openai>=1.30.0",
+]
 dev = [
     "pytest>=8.0.0",
     "pytest-cov>=4.0.0",
     "ruff>=0.4.0",
     "mypy>=1.10.0",
+    "openai>=1.30.0",
 ]
 all = [
-    "autostrategy[backtest,data,dev]",
+    "autostrategy[backtest,data,llm,dev]",
 ]
 
 [project.scripts]
