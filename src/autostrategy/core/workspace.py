@@ -8,6 +8,7 @@ from pathlib import Path
 import yaml
 
 from autostrategy.core.strategy import Strategy, StrategyStatus
+from autostrategy.core.template_registry import TemplateRegistry
 
 
 DEFAULT_WORKSPACE_ROOT = Path.home() / ".autostrategy" / "strategies"
@@ -46,6 +47,8 @@ class Workspace:
         strategy_dir.mkdir(parents=True)
         self._write_strategy_meta(strategy_dir, strategy)
         self._write_default_files(strategy_dir)
+        if template:
+            TemplateRegistry.apply_template(template, strategy_dir)
         return strategy
 
     def _write_strategy_meta(self, strategy_dir: Path, strategy: Strategy) -> None:
