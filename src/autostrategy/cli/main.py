@@ -5,8 +5,11 @@ from pathlib import Path
 import typer
 
 from autostrategy import __version__
+from autostrategy.agents.codegen_agent import CodegenAgent
 from autostrategy.agents.design_agent import DesignAgent
 from autostrategy.config import init_settings, load_settings, save_settings
+from autostrategy.core.backtest_engine import run_backtest_workflow
+from autostrategy.core.strategy import StrategyStatus
 from autostrategy.core.template_registry import TemplateRegistry
 from autostrategy.core.workspace import Workspace
 
@@ -202,6 +205,60 @@ def design_create(
     except ValueError as e:
         typer.echo(f"Error: {e}")
         raise typer.Exit(1)
+
+
+codegen_app = typer.Typer(help="Generate executable strategy files with AI.")
+app.add_typer(codegen_app, name="codegen")
+
+
+@codegen_app.command("create")
+def codegen_create(
+    slug: str = typer.Argument(..., help="Strategy slug."),
+    workspace_root: str | None = typer.Option(
+        None, "--workspace-root", help="Workspace root directory."
+    ),
+    force: bool = typer.Option(False, "--force", help="Overwrite existing strategy.py."),
+) -> None:
+    """Generate strategy.py, config.yaml, README.md and support files."""
+    settings = load_settings()
+    workspace = Workspace(root=_workspace_root_option(workspace_root))
+    agent = CodegenAgent(llm_config=settings.llm)
+    try:
+        strategy = agent.codegen_and_save(workspace=workspace, slug=slug, force=force)
+    except (FileNotFoundError, ValueError, FileExistsError) as e:
+        typer.echo(f"Error: {e}")
+        raise typer.Exit(1)
+    typer.echo(f"Strategy '{strategy.slug}' coded at {strategy.workspace_dir}")
+    typer.echo("Generated files: strategy.py, config.yaml, README.md, requirements.txt, data/fetch_data.py")
+
+
+backtest_app = typer.Typer(help="Run strategy backtests.")
+app.add_typer(backtest_app, name="backtest")
+
+
+@backtest_app.command("run")
+def backtest_run(
+    slug: str = typer.Argument(..., help="Strategy slug."),
+    workspace_root: str | None = typer.Option(
+        None, "--workspace-root", help="Workspace root directory."
+    ),
+) -> None:
+    """Run a standard backtest for a strategy."""
+    workspace = Workspace(root=_workspace_root_option(workspace_root))
+    strategy = workspace.get_strategy(slug)
+    if strategy is None:
+        typer.echo(f"Error: Strategy '{slug}' not found.")
+        raise typer.Exit(1)
+
+    result = run_backtest_workflow(workspace.get_strategy_dir(slug))
+    if "error" in result:
+        typer.echo(f"Error: {result['error']}")
+        raise typer.Exit(1)
+
+    workspace.update_strategy_status(slug, StrategyStatus.BACKTESTED)
+    typer.echo(f"Backtest completed for '{slug}'.")
+    typer.echo(f"Score: {result['score']}/100")
+    typer.echo("Result saved to backtest/results/backtest_result.json")
 
 
 if __name__ == "__main__":
