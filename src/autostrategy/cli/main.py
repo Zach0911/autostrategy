@@ -86,6 +86,17 @@ def _workspace_root_option(workspace_root: str | None) -> Path | None:
     return Path(workspace_root) if workspace_root else None
 
 
+def _echo_strategy_paths(workspace: Workspace, slug: str) -> None:
+    strategy_dir = workspace.get_strategy_dir(slug)
+    typer.echo(f"Workspace: {strategy_dir}")
+    typer.echo(f"Metadata: {strategy_dir / 'strategy.yaml'}")
+    typer.echo(f"Design: {strategy_dir / 'STRATEGY_DESIGN.md'}")
+    typer.echo(f"Strategy code: {strategy_dir / 'strategy.py'}")
+    typer.echo(f"Config: {strategy_dir / 'config.yaml'}")
+    typer.echo(f"README: {strategy_dir / 'README.md'}")
+    typer.echo(f"Backtest result: {strategy_dir / 'backtest' / 'results' / 'backtest_result.json'}")
+
+
 @strategy_app.command("list")
 def strategy_list(
     workspace_root: str | None = typer.Option(
@@ -149,6 +160,22 @@ def strategy_show(
     typer.echo(f"Market: {strategy.market}")
     typer.echo(f"Status: {strategy.status.value}")
     typer.echo(f"Template: {strategy.template or 'none'}")
+    _echo_strategy_paths(workspace, slug)
+
+
+@strategy_app.command("paths")
+def strategy_paths(
+    slug: str = typer.Argument(..., help="Strategy slug."),
+    workspace_root: str | None = typer.Option(
+        None, "--workspace-root", help="Workspace root directory."
+    ),
+) -> None:
+    """Show local file paths for a strategy workspace."""
+    workspace = Workspace(root=_workspace_root_option(workspace_root))
+    if not workspace.get_strategy(slug):
+        typer.echo(f"Strategy '{slug}' not found.")
+        raise typer.Exit(1)
+    _echo_strategy_paths(workspace, slug)
 
 
 @strategy_app.command("delete")
