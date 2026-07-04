@@ -8,6 +8,22 @@
 
 > ⚠️ **免责声明**：本工具生成的策略仅供学习和研究用途，不构成任何投资建议。量化交易有风险，过往回测表现不代表未来收益。
 
+## 快速开始（产品版）
+
+```bash
+# 安装
+pip install -e .
+
+# 初始化配置
+autostrategy config init
+
+# 查看版本
+autostrategy --version
+
+# 查看策略列表
+autostrategy strategy list
+```
+
 ## 它能做什么？
 
 | 入口 | 你说 | 它做 |
