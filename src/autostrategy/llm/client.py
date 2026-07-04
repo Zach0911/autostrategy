@@ -40,6 +40,11 @@ class LLMClient:
 
     def chat(self, messages: list[ChatMessage], **kwargs: Any) -> str:
         """Send a chat request and return the content string."""
+        if self.api_key is None:
+            raise RuntimeError(
+                "No LLM API key found. Set AUTOSTRATEGY_LLM_API_KEY, "
+                f"{self.config.provider.upper()}_API_KEY, or OPENAI_API_KEY."
+            )
         if self.config.provider == "openai" or self.config.base_url:
             return self._chat_openai_compatible(messages, **kwargs)
         raise NotImplementedError(f"Provider '{self.config.provider}' is not supported yet.")
