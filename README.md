@@ -8,6 +8,161 @@
 
 > ⚠️ **免责声明**：本工具生成的策略仅供学习和研究用途，不构成任何投资建议。量化交易有风险，过往回测表现不代表未来收益。
 
+## 快速开始（产品版）
+
+```bash
+# 安装开发版
+pip install -e .
+
+# 初始化本地配置，会创建 ~/.autostrategy/settings.yaml
+autostrategy config init
+
+# 配置 LLM。API key 不写入配置文件，只从环境变量读取
+autostrategy config set llm.provider openai
+autostrategy config set llm.model gpt-4o-mini
+export AUTOSTRATEGY_LLM_API_KEY="你的 API Key"
+
+# 创建策略工作区
+autostrategy strategy create dual-ma --template dual-ma
+
+# 查看策略路径
+autostrategy strategy paths dual-ma
+
+# 用自然语言生成 STRATEGY_DESIGN.md，需要已配置 LLM key
+autostrategy design create \
+  --prompt "帮我做一个 A 股双均线策略" \
+  --name dual-ma \
+  --template dual-ma
+
+# 从 STRATEGY_DESIGN.md 生成 strategy.py/config.yaml/README.md 等文件
+autostrategy codegen create dual-ma --force
+
+# 执行本地回测并生成 backtest/results/backtest_result.json
+autostrategy backtest run dual-ma
+
+# 查看策略状态，应从 draft/designed/coded 流转到 backtested
+autostrategy strategy show dual-ma
+```
+
+> `design create` 和 `codegen create` 会调用用户自己配置的 LLM Provider。开源项目不会内置 API key，也不会替用户付费。
+
+## 本地 Web / REST API / MCP（Phase 4A-4B）
+
+Phase 4A 将 autostrategy 从纯 CLI 扩展为本地 Agent 服务平台骨架：CLI、REST API、Dashboard 和 MCP 工具复用同一套 service layer。
+
+Phase 4B 将 Dashboard 升级为基于 **Ant Design 官方组件与默认主题** 的浏览器工作台。Web 端使用 React + Vite + TypeScript + `antd`，不引入 Tailwind、Bootstrap、shadcn/ui 或其他主题系统。
+
+### 安装 Phase 4A/4B 依赖
+
+```bash
+# Python 侧：包含测试、API、Web Dashboard、MCP adapter
+pip install -e ".[dev,api,web,mcp]"
+
+# 前端侧：安装 Ant Design React 工作台依赖
+npm install
+npm run build
+```
+
+### 前端开发命令
+
+```bash
+# 开发服务器，仅用于前端迭代
+npm run dev
+
+# 构建到 src/autostrategy/web/static，由 autostrategy serve 托管
+npm run build
+
+# 运行前端测试
+npm test
+```
+
+### 启动本地服务
+
+```bash
+autostrategy serve --host 127.0.0.1 --port 8000
+```
+
+启动后可访问：
+
+| 地址 | 用途 |
+|------|------|
+| `http://127.0.0.1:8000/` | Ant Design 本地策略工作台 |
+| `http://127.0.0.1:8000/docs` | FastAPI OpenAPI 文档 |
+| `http://127.0.0.1:8000/api/v1/health` | 健康检查 |
+| `http://127.0.0.1:8000/api/v1/strategies` | 策略列表 API |
+| `http://127.0.0.1:8000/api/v1/templates` | 内置模板 API |
+
+也可以指定工作区：
+
+```bash
+autostrategy serve --workspace-root /path/to/strategies
+```
+
+> 默认仅建议监听 `127.0.0.1`。Phase 4A 是本地优先能力，不提供多用户鉴权和远程托管安全边界。
+
+### REST API 示例
+
+```bash
+# 健康检查
+curl http://127.0.0.1:8000/api/v1/health
+
+# 创建策略工作区
+curl -X POST http://127.0.0.1:8000/api/v1/strategies \
+  -H "Content-Type: application/json" \
+  -d '{"name":"phase4a-demo","market":"A股","template":"dual-ma"}'
+
+# 查看策略详情
+curl http://127.0.0.1:8000/api/v1/strategies/phase4a-demo
+
+# 查看策略 artifact 状态
+curl http://127.0.0.1:8000/api/v1/strategies/phase4a-demo/artifacts
+
+# 预览设计文档
+curl http://127.0.0.1:8000/api/v1/strategies/phase4a-demo/artifacts/design
+
+# 运行回测（需要 strategy.py 已存在）
+curl -X POST http://127.0.0.1:8000/api/v1/strategies/phase4a-demo/backtest
+
+# 启动模拟运行（需要 strategy.py 暴露 run_paper(config)）
+curl -X POST http://127.0.0.1:8000/api/v1/strategies/phase4a-demo/paper-run
+
+# 查看模拟运行结果
+curl http://127.0.0.1:8000/api/v1/strategies/phase4a-demo/paper-run-result
+```
+
+### Phase 5A — 模拟运行（Paper Run）
+
+Phase 5A 提供 **replay-first 模拟运行**：策略代码只需暴露 `run_paper(config)`，即可在本地按历史数据重放决策，并产出可审计的 paper run artifact。
+
+模拟运行会写入：
+
+- `paper_run/results/paper_run_result.json` — 当前状态、汇总指标、最新决策
+- `paper_run/results/paper_run_events.jsonl` — 逐笔决策审计流
+- `paper_run/logs/paper_run.log` — 运行日志
+
+> Phase 5A 还不是完整模拟盘：不做真实 broker、不做实时行情订阅、不做完整订单生命周期。它先把“本地 replay → 落盘 → 展示”的最小闭环跑通，为后续 Phase 5B 准实时运行打基础。
+
+### MCP 工具范围
+
+Phase 4A 提供保守的 MCP adapter，主要用于本地 Agent 读取策略状态和触发低风险操作：
+
+- `list_strategies`
+- `get_strategy`
+- `get_strategy_paths`
+- `list_templates`
+- `get_backtest_result`
+- `create_strategy`
+- `run_backtest`
+
+暂不开放 `design_strategy` / `codegen_strategy` 作为 MCP 工具，避免其他 Agent 自动形成“生成代码 → 执行代码”的高风险链路。
+
+### Phase 4A 安全边界
+
+- API/MCP 只能通过 strategy slug 访问当前 workspace 内文件。
+- `Workspace` 会拒绝 `../`、绝对路径等 path traversal。
+- `CodegenAgent` 会拒绝明显危险的生成代码模式，例如 `os.system`、`subprocess`、`eval(`、`exec(`。
+- 回测仍会在本地执行策略代码；这是本地研究工具，不是远程沙箱服务。
+
 ## 它能做什么？
 
 | 入口 | 你说 | 它做 |
@@ -98,24 +253,55 @@ pip install numpy pandas pyyaml
 
 ```
 autostrategy/
-├── SKILL.md                          # 调度台：入口分流 + Agent 编排 + 审批点控制
-├── prompts/
-│   ├── design_agent.md               # Phase 1：策略设计 Agent 指令
-│   ├── codegen_agent.md              # Phase 2：代码生成 Agent 指令
-│   └── optimization_agent.md         # Phase 3：自主优化 Agent 指令
+├── pyproject.toml                     # Python 包定义与 CLI 入口
+├── VERSION                            # 当前版本
+├── CHANGELOG.md                       # 版本变更记录
+├── TODOS.md                           # 项目待办与已完成事项
+├── SKILL.md                           # 兼容旧 Skill 安装路径的 shim
+├── src/autostrategy/
+│   ├── cli/main.py                    # Typer CLI
+│   ├── api/                           # FastAPI REST API
+│   │   ├── app.py
+│   │   ├── routers/                   # strategies / design / codegen / backtest / paper_run / artifacts / config / health
+│   │   ├── schemas.py
+│   │   └── dependencies.py
+│   ├── services/                      # 业务 service layer
+│   │   ├── strategy_service.py
+│   │   ├── design_service.py
+│   │   ├── codegen_service.py
+│   │   ├── backtest_service.py
+│   │   ├── backtest_job_service.py
+│   │   ├── paper_run_service.py
+│   │   ├── paper_run_job_service.py
+│   │   └── artifact_service.py
+│   ├── mcp/                           # MCP adapter
+│   │   ├── server.py
+│   │   └── tools.py
+│   ├── web/                           # Ant Design React 工作台
+│   │   └── frontend/
+│   │       ├── src/App.tsx
+│   │       └── ...
+│   ├── config.py                      # 本地配置与 LLM Provider 配置
+│   ├── llm/client.py                  # OpenAI-compatible LLM Client
+│   ├── agents/
+│   │   ├── design_agent.py            # 自然语言 → STRATEGY_DESIGN.md
+│   │   └── codegen_agent.py           # STRATEGY_DESIGN.md → strategy.py/config/README
+│   ├── core/
+│   │   ├── strategy.py                # Strategy 领域模型与状态
+│   │   ├── workspace.py               # 策略工作区 CRUD 与文件 API
+│   │   ├── template_registry.py       # 内置模板市场
+│   │   └── backtest_engine.py         # 可导入的产品化回测引擎 + paper run workflow
+│   └── templates/                     # dual-ma / grid / momentum 模板
+├── .claude/skills/autostrategy/       # Claude Code Skill 兼容层
+│   └── prompts/                       # 原 Skill prompts
 ├── scripts/
-│   ├── env_setup.py                  # 环境检查与依赖安装
-│   ├── quality_check.py              # 策略设计文档质量检查
-│   └── run_backtest.py               # 回测执行与评分
+│   ├── env_setup.py                   # 环境检查与依赖安装
+│   ├── quality_check.py               # 旧版策略设计文档质量检查
+│   └── run_backtest.py                # 兼容脚本入口
 ├── examples/
-│   └── dynamic-grid-multi-market/    # 示例：动态网格多标的策略
-│       ├── STRATEGY_DESIGN.md
-│       ├── config.yaml
-│       ├── strategy.py
-│       ├── requirements.txt
-│       └── data/
-│           └── fetch_data.py
-└── skills-lock.json
+│   └── dynamic-grid-multi-market/     # 示例：动态网格多标的策略
+├── docs/superpowers/                  # 产品化设计文档与计划
+└── tests/                             # unit / integration 测试
 ```
 
 ## 示例策略
@@ -140,9 +326,13 @@ autostrategy/
 
 ## 技术栈
 
-- **语言**：Python 3.9+
+- **语言**：Python 3.11+
+- **CLI**：Typer
+- **配置/数据模型**：Pydantic + PyYAML
 - **数据处理**：NumPy, Pandas
-- **数据源**：[FTShare](https://github.com/rivar0107/all-in-one)（A股）、FutuAPI（港美股）
+- **回测**：函数式 `run_backtest(config)` 优先，兼容 Backtrader Strategy class
+- **数据源**：[FTShare](https://github.com/rivar0107/all-in-one)（A股）、FutuAPI（港美股）、akshare/yfinance 等可扩展源
+- **LLM Provider**：OpenAI-compatible，本地读取用户环境变量中的 API key
 - **AI Agent 兼容**：Claude Code, Gemini CLI, Copilot CLI, Codex, Cline 等
 
 ## 相关项目
