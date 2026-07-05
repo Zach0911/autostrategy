@@ -117,14 +117,30 @@ class Workspace:
             raise FileNotFoundError(f"Strategy '{slug}' not found.")
         return strategy_dir
 
+    def resolve_strategy_path(self, slug: str, relative_path: str | Path) -> Path:
+        """Resolve a path inside a strategy workspace safely.
+
+        The API/MCP layers may pass user-controlled paths. This method keeps
+        file access constrained to the selected strategy directory.
+        """
+        path = Path(relative_path)
+        if path.is_absolute() or str(relative_path).strip() == "":
+            raise ValueError(f"Unsafe strategy file path: {relative_path}")
+
+        strategy_dir = self.get_strategy_dir(slug).resolve()
+        candidate = (strategy_dir / path).resolve()
+        if candidate != strategy_dir and strategy_dir not in candidate.parents:
+            raise ValueError(f"Unsafe strategy file path: {relative_path}")
+        return candidate
+
     def read_text_file(self, slug: str, relative_path: str) -> str:
         """Read a UTF-8 text file from a strategy workspace."""
-        file_path = self.get_strategy_dir(slug) / relative_path
+        file_path = self.resolve_strategy_path(slug, relative_path)
         return file_path.read_text(encoding="utf-8")
 
     def write_text_file(self, slug: str, relative_path: str, content: str) -> Path:
         """Write a UTF-8 text file inside a strategy workspace."""
-        file_path = self.get_strategy_dir(slug) / relative_path
+        file_path = self.resolve_strategy_path(slug, relative_path)
         file_path.parent.mkdir(parents=True, exist_ok=True)
         file_path.write_text(content, encoding="utf-8")
         return file_path

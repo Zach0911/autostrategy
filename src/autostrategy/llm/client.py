@@ -2,11 +2,10 @@
 
 from __future__ import annotations
 
-import os
 from dataclasses import dataclass
 from typing import Any
 
-from autostrategy.config import LLMConfig
+from autostrategy.config import LLMConfig, get_llm_api_key_status, resolve_llm_api_key
 
 
 @dataclass
@@ -26,24 +25,16 @@ class LLMClient:
 
     def _resolve_api_key(self) -> str | None:
         """Resolve API key from environment or known provider variables."""
-        env_vars = [
-            self.config.api_key_env,
-            "AUTOSTRATEGY_LLM_API_KEY",
-            f"{self.config.provider.upper()}_API_KEY",
-            "OPENAI_API_KEY",
-        ]
-        for env_var in env_vars:
-            value = os.environ.get(env_var)
-            if value:
-                return value
-        return None
+        return resolve_llm_api_key(self.config)
 
     def chat(self, messages: list[ChatMessage], **kwargs: Any) -> str:
         """Send a chat request and return the content string."""
         if self.api_key is None:
-            raise RuntimeError(
-                "No LLM API key found. Set AUTOSTRATEGY_LLM_API_KEY, "
-                f"{self.config.provider.upper()}_API_KEY, or OPENAI_API_KEY."
+            from autostrategy.services.exceptions import LLMConfigurationRequiredError
+
+            raise LLMConfigurationRequiredError(
+                get_llm_api_key_status(self.config),
+                provider=self.config.provider,
             )
         if self.config.provider == "openai" or self.config.base_url:
             return self._chat_openai_compatible(messages, **kwargs)

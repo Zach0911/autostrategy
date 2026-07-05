@@ -30,6 +30,15 @@ REQUIRED_GENERATED_FILES = {
     "data/fetch_data.py",
 }
 
+DANGEROUS_CODE_PATTERNS = {
+    "os.system": "shell command execution",
+    "subprocess": "subprocess execution",
+    "socket": "raw network access",
+    "eval(": "dynamic code evaluation",
+    "exec(": "dynamic code execution",
+    "shutil.rmtree": "recursive file deletion",
+}
+
 
 @dataclass
 class CodegenQualityReport:
@@ -118,6 +127,9 @@ class CodegenAgent:
         for relative_path in sorted(missing):
             errors.append(f"Missing generated file: {relative_path}")
 
+        self._check_python_code_safety(files.get("strategy.py", ""), "strategy.py", errors)
+        self._check_python_code_safety(files.get("data/fetch_data.py", ""), "data/fetch_data.py", errors)
+
         strategy_py = files.get("strategy.py", "")
         if strategy_py:
             try:
@@ -173,3 +185,11 @@ class CodegenAgent:
                 errors.append("data/fetch_data.py must expose fetch(config).")
 
         return CodegenQualityReport(passed=not errors, errors=errors, warnings=warnings)
+
+    def _check_python_code_safety(self, code: str, relative_path: str, errors: list[str]) -> None:
+        """Reject generated Python code with clearly dangerous primitives."""
+        if not code:
+            return
+        for pattern, reason in DANGEROUS_CODE_PATTERNS.items():
+            if pattern in code:
+                errors.append(f"{relative_path} contains dangerous pattern '{pattern}': {reason}")

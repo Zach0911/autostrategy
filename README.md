@@ -46,6 +46,105 @@ autostrategy strategy show dual-ma
 
 > `design create` 和 `codegen create` 会调用用户自己配置的 LLM Provider。开源项目不会内置 API key，也不会替用户付费。
 
+## 本地 Web / REST API / MCP（Phase 4A-4B）
+
+Phase 4A 将 autostrategy 从纯 CLI 扩展为本地 Agent 服务平台骨架：CLI、REST API、Dashboard 和 MCP 工具复用同一套 service layer。
+
+Phase 4B 将 Dashboard 升级为基于 **Ant Design 官方组件与默认主题** 的浏览器工作台。Web 端使用 React + Vite + TypeScript + `antd`，不引入 Tailwind、Bootstrap、shadcn/ui 或其他主题系统。
+
+### 安装 Phase 4A/4B 依赖
+
+```bash
+# Python 侧：包含测试、API、Web Dashboard、MCP adapter
+pip install -e ".[dev,api,web,mcp]"
+
+# 前端侧：安装 Ant Design React 工作台依赖
+npm install
+npm run build
+```
+
+### 前端开发命令
+
+```bash
+# 开发服务器，仅用于前端迭代
+npm run dev
+
+# 构建到 src/autostrategy/web/static，由 autostrategy serve 托管
+npm run build
+
+# 运行前端测试
+npm test
+```
+
+### 启动本地服务
+
+```bash
+autostrategy serve --host 127.0.0.1 --port 8000
+```
+
+启动后可访问：
+
+| 地址 | 用途 |
+|------|------|
+| `http://127.0.0.1:8000/` | Ant Design 本地策略工作台 |
+| `http://127.0.0.1:8000/docs` | FastAPI OpenAPI 文档 |
+| `http://127.0.0.1:8000/api/v1/health` | 健康检查 |
+| `http://127.0.0.1:8000/api/v1/strategies` | 策略列表 API |
+| `http://127.0.0.1:8000/api/v1/templates` | 内置模板 API |
+
+也可以指定工作区：
+
+```bash
+autostrategy serve --workspace-root /path/to/strategies
+```
+
+> 默认仅建议监听 `127.0.0.1`。Phase 4A 是本地优先能力，不提供多用户鉴权和远程托管安全边界。
+
+### REST API 示例
+
+```bash
+# 健康检查
+curl http://127.0.0.1:8000/api/v1/health
+
+# 创建策略工作区
+curl -X POST http://127.0.0.1:8000/api/v1/strategies \
+  -H "Content-Type: application/json" \
+  -d '{"name":"phase4a-demo","market":"A股","template":"dual-ma"}'
+
+# 查看策略详情
+curl http://127.0.0.1:8000/api/v1/strategies/phase4a-demo
+
+# 查看策略 artifact 状态
+curl http://127.0.0.1:8000/api/v1/strategies/phase4a-demo/artifacts
+
+# 预览设计文档
+curl http://127.0.0.1:8000/api/v1/strategies/phase4a-demo/artifacts/design
+
+# 运行回测（需要 strategy.py 已存在）
+curl -X POST http://127.0.0.1:8000/api/v1/strategies/phase4a-demo/backtest
+```
+
+### MCP 工具范围
+
+Phase 4A 提供保守的 MCP adapter，主要用于本地 Agent 读取策略状态和触发低风险操作：
+
+- `list_strategies`
+- `get_strategy`
+- `get_strategy_paths`
+- `list_templates`
+- `get_backtest_result`
+- `create_strategy`
+- `run_backtest`
+
+暂不开放 `design_strategy` / `codegen_strategy` 作为 MCP 工具，避免其他 Agent 自动形成“生成代码 → 执行代码”的高风险链路。
+
+### Phase 4A 安全边界
+
+- API/MCP 只能通过 strategy slug 访问当前 workspace 内文件。
+- `Workspace` 会拒绝 `../`、绝对路径等 path traversal。
+- `CodegenAgent` 会拒绝明显危险的生成代码模式，例如 `os.system`、`subprocess`、`eval(`、`exec(`。
+- 回测仍会在本地执行策略代码；这是本地研究工具，不是远程沙箱服务。
+
 ## 它能做什么？
 
 | 入口 | 你说 | 它做 |

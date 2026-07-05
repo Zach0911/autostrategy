@@ -16,6 +16,9 @@ env/
 # OS
 .DS_Store
 
+# Frontend dependencies
+node_modules/
+
 # Test / coverage artifacts
 .pytest_cache/
 .coverage/
@@ -37,3 +40,4 @@ completed/
 # Private per-user config (project-level CLAUDE.md should be committed if shared)
 .claude/settings.json
 .claude/CLAUDE.md
+.claude/worktrees/

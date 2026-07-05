@@ -97,6 +97,22 @@ def test_codegen_agent_generates_files(tmp_path, monkeypatch):
     assert (tmp_path / "dual-ma" / "data" / "fetch_data.py").exists()
 
 
+def test_codegen_rejects_dangerous_python_patterns():
+    agent = CodegenAgent(llm_config=LLMConfig())
+    files = {
+        "strategy.py": "import subprocess\n\ndef run_backtest(config):\n    return {}\n",
+        "config.yaml": "initial_cash: 1000000\nstart_date: '2024-01-01'\nend_date: '2024-12-31'\ncommission: 0.0003\nslippage: 0.001\nmarket: A股\n",
+        "README.md": "# Demo\n\n## 策略概述\n\nDemo\n",
+        "requirements.txt": "pandas\nnumpy\n",
+        "data/fetch_data.py": "def fetch(config):\n    return None\n",
+    }
+
+    report = agent.check_generated_files(files)
+
+    assert not report.passed
+    assert any("dangerous pattern" in error for error in report.errors)
+
+
 def test_codegen_rejects_missing_design(tmp_path):
     workspace = Workspace(root=tmp_path)
     strategy = workspace.create_strategy("empty")

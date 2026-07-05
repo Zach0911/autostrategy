@@ -288,5 +288,35 @@ def backtest_run(
     typer.echo("Result saved to backtest/results/backtest_result.json")
 
 
+@app.command("serve")
+def serve(
+    host: str = typer.Option("127.0.0.1", "--host", help="Host to bind."),
+    port: int = typer.Option(8000, "--port", help="Port to bind."),
+    reload: bool = typer.Option(False, "--reload", help="Enable uvicorn reload."),
+    workspace_root: str | None = typer.Option(
+        None, "--workspace-root", help="Workspace root directory."
+    ),
+) -> None:
+    """Start the local REST API and dashboard."""
+    try:
+        import uvicorn
+    except ImportError as exc:
+        typer.echo("Error: uvicorn is required. Install with: pip install -e '.[api,web]'")
+        raise typer.Exit(1) from exc
+
+    if workspace_root:
+        from autostrategy.api.app import create_app
+
+        uvicorn.run(
+            create_app(workspace_root=_workspace_root_option(workspace_root)),
+            host=host,
+            port=port,
+            reload=False,
+        )
+        return
+
+    uvicorn.run("autostrategy.api.app:app", host=host, port=port, reload=reload)
+
+
 if __name__ == "__main__":
     app()
