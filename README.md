@@ -122,7 +122,25 @@ curl http://127.0.0.1:8000/api/v1/strategies/phase4a-demo/artifacts/design
 
 # 运行回测（需要 strategy.py 已存在）
 curl -X POST http://127.0.0.1:8000/api/v1/strategies/phase4a-demo/backtest
+
+# 启动模拟运行（需要 strategy.py 暴露 run_paper(config)）
+curl -X POST http://127.0.0.1:8000/api/v1/strategies/phase4a-demo/paper-run
+
+# 查看模拟运行结果
+curl http://127.0.0.1:8000/api/v1/strategies/phase4a-demo/paper-run-result
 ```
+
+### Phase 5A — 模拟运行（Paper Run）
+
+Phase 5A 提供 **replay-first 模拟运行**：策略代码只需暴露 `run_paper(config)`，即可在本地按历史数据重放决策，并产出可审计的 paper run artifact。
+
+模拟运行会写入：
+
+- `paper_run/results/paper_run_result.json` — 当前状态、汇总指标、最新决策
+- `paper_run/results/paper_run_events.jsonl` — 逐笔决策审计流
+- `paper_run/logs/paper_run.log` — 运行日志
+
+> Phase 5A 还不是完整模拟盘：不做真实 broker、不做实时行情订阅、不做完整订单生命周期。它先把“本地 replay → 落盘 → 展示”的最小闭环跑通，为后续 Phase 5B 准实时运行打基础。
 
 ### MCP 工具范围
 
@@ -236,9 +254,33 @@ pip install numpy pandas pyyaml
 ```
 autostrategy/
 ├── pyproject.toml                     # Python 包定义与 CLI 入口
+├── VERSION                            # 当前版本
+├── CHANGELOG.md                       # 版本变更记录
+├── TODOS.md                           # 项目待办与已完成事项
 ├── SKILL.md                           # 兼容旧 Skill 安装路径的 shim
 ├── src/autostrategy/
 │   ├── cli/main.py                    # Typer CLI
+│   ├── api/                           # FastAPI REST API
+│   │   ├── app.py
+│   │   ├── routers/                   # strategies / design / codegen / backtest / paper_run / artifacts / config / health
+│   │   ├── schemas.py
+│   │   └── dependencies.py
+│   ├── services/                      # 业务 service layer
+│   │   ├── strategy_service.py
+│   │   ├── design_service.py
+│   │   ├── codegen_service.py
+│   │   ├── backtest_service.py
+│   │   ├── backtest_job_service.py
+│   │   ├── paper_run_service.py
+│   │   ├── paper_run_job_service.py
+│   │   └── artifact_service.py
+│   ├── mcp/                           # MCP adapter
+│   │   ├── server.py
+│   │   └── tools.py
+│   ├── web/                           # Ant Design React 工作台
+│   │   └── frontend/
+│   │       ├── src/App.tsx
+│   │       └── ...
 │   ├── config.py                      # 本地配置与 LLM Provider 配置
 │   ├── llm/client.py                  # OpenAI-compatible LLM Client
 │   ├── agents/
@@ -248,7 +290,7 @@ autostrategy/
 │   │   ├── strategy.py                # Strategy 领域模型与状态
 │   │   ├── workspace.py               # 策略工作区 CRUD 与文件 API
 │   │   ├── template_registry.py       # 内置模板市场
-│   │   └── backtest_engine.py         # 可导入的产品化回测引擎
+│   │   └── backtest_engine.py         # 可导入的产品化回测引擎 + paper run workflow
 │   └── templates/                     # dual-ma / grid / momentum 模板
 ├── .claude/skills/autostrategy/       # Claude Code Skill 兼容层
 │   └── prompts/                       # 原 Skill prompts
@@ -258,6 +300,7 @@ autostrategy/
 │   └── run_backtest.py                # 兼容脚本入口
 ├── examples/
 │   └── dynamic-grid-multi-market/     # 示例：动态网格多标的策略
+├── docs/superpowers/                  # 产品化设计文档与计划
 └── tests/                             # unit / integration 测试
 ```
 
