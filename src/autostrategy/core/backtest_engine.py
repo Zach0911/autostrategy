@@ -7,6 +7,7 @@ import importlib.util
 import json
 import re
 import sys
+from datetime import UTC, datetime
 from pathlib import Path
 
 import numpy as np
@@ -184,6 +185,122 @@ def run_backtest_workflow(strategy_dir: Path, output_path: Path | None = None) -
     }
     save_json(output_path or output_dir / "backtest_result.json", result)
     return result
+
+
+def run_paper_replay_workflow(strategy_dir: Path, stop_requested=None) -> dict:
+    """Run a replay-first paper run workflow and save paper artifacts."""
+    config = load_config(strategy_dir)
+    module = _load_strategy_module(strategy_dir)
+    result_path = strategy_dir / "paper_run" / "results" / "paper_run_result.json"
+    events_path = strategy_dir / "paper_run" / "results" / "paper_run_events.jsonl"
+    log_path = strategy_dir / "paper_run" / "logs" / "paper_run.log"
+    started_at = _utc_now()
+
+    if module is None:
+        result = _paper_failed_result(started_at, f"strategy.py 不存在: {strategy_dir / 'strategy.py'}")
+        _write_paper_artifacts(result_path, events_path, log_path, result, [])
+        return result
+
+    if not hasattr(module, "run_paper"):
+        result = _paper_failed_result(started_at, "strategy.py 未暴露 run_paper(config) 函数")
+        _write_paper_artifacts(result_path, events_path, log_path, result, [])
+        return result
+
+    try:
+        raw = module.run_paper(config)
+    except Exception as exc:
+        result = _paper_failed_result(started_at, f"run_paper() 执行失败: {exc}")
+        _write_paper_artifacts(result_path, events_path, log_path, result, [])
+        return result
+
+    if not isinstance(raw, dict):
+        result = _paper_failed_result(started_at, "run_paper() 必须返回 dict")
+        _write_paper_artifacts(result_path, events_path, log_path, result, [])
+        return result
+
+    if stop_requested and stop_requested():
+        result = _paper_result_from_raw(raw, started_at, run_status="stopped")
+    elif "error" in raw:
+        result = _paper_failed_result(started_at, str(raw["error"]), raw)
+    else:
+        result = _paper_result_from_raw(raw, started_at, run_status="completed")
+
+    _write_paper_artifacts(result_path, events_path, log_path, result, _paper_events_from_raw(raw))
+    return result
+
+
+def _utc_now() -> str:
+    return datetime.now(UTC).isoformat()
+
+
+def _paper_failed_result(started_at: str, error: str, raw: dict | None = None) -> dict:
+    result = _paper_result_from_raw(raw or {}, started_at, run_status="failed")
+    result["error"] = error
+    result["diagnostics"] = [{"item": "paper_run", "status": "❌", "detail": error}]
+    return result
+
+
+def _paper_result_from_raw(raw: dict, started_at: str, run_status: str) -> dict:
+    updated_at = _utc_now()
+    paper = raw.get("paper") if isinstance(raw.get("paper"), dict) else raw
+    summary = raw.get("summary") if isinstance(raw.get("summary"), dict) else _paper_summary(paper)
+    events = _paper_events_from_raw(raw)
+    latest_decision = raw.get("latest_decision") or (events[-1] if events else None)
+    bars_processed = int(raw.get("bars_processed") or len(raw.get("equity_curve", [])) or len(events))
+    replay = raw.get("replay") if isinstance(raw.get("replay"), dict) else {}
+    current_at = replay.get("current_at") or paper.get("current_at")
+    if current_at is None and latest_decision:
+        current_at = latest_decision.get("timestamp")
+    replay = {
+        "current_at": current_at,
+        "bars_processed": replay.get("bars_processed", bars_processed),
+        "progress": replay.get("progress", 1.0 if run_status in {"completed", "failed", "stopped"} else 0.0),
+    }
+    return {
+        "mode": "paper_run",
+        "run_status": run_status,
+        "started_at": raw.get("started_at") or started_at,
+        "updated_at": updated_at,
+        "replay": replay,
+        "summary": summary,
+        "latest_decision": latest_decision,
+        "diagnostics": raw.get("diagnostics", []),
+        "error": raw.get("error"),
+    }
+
+
+def _paper_summary(paper: dict) -> dict:
+    initial_cash = float(paper.get("initial_cash", 0) or 0)
+    final_value = float(paper.get("final_value", initial_cash) or 0)
+    total_return = paper.get("total_return")
+    if total_return is None and initial_cash:
+        total_return = (final_value - initial_cash) / initial_cash * 100
+    return {
+        "paper_return": round(float(total_return or 0), 2),
+        "paper_max_drawdown": float(paper.get("max_drawdown", 0) or 0),
+        "trade_count": int(paper.get("trade_count", paper.get("total_trades", 0)) or 0),
+        "position_count": int(paper.get("position_count", 0) or 0),
+        "final_value": round(final_value, 2),
+    }
+
+
+def _paper_events_from_raw(raw: dict) -> list[dict]:
+    events = raw.get("events", raw.get("decisions", []))
+    return events if isinstance(events, list) else []
+
+
+def _write_paper_artifacts(
+    result_path: Path,
+    events_path: Path,
+    log_path: Path,
+    result: dict,
+    events: list[dict],
+) -> None:
+    save_json(result_path, result)
+    events_path.parent.mkdir(parents=True, exist_ok=True)
+    events_path.write_text("".join(json.dumps(event, ensure_ascii=False) + "\n" for event in events), encoding="utf-8")
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    log_path.write_text(f"{result['updated_at']} {result['run_status']}\n", encoding="utf-8")
 
 
 def save_json(path: Path, data: dict) -> None:

@@ -17,6 +17,7 @@ class StrategyStatus(str, Enum):
     DESIGNED = "designed"
     CODED = "coded"
     BACKTESTED = "backtested"
+    PAPER_RUNNING = "paper_running"
     OPTIMIZED = "optimized"
     ACTIVE = "active"
     ARCHIVED = "archived"
