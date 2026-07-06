@@ -1,342 +1,311 @@
 # Autostrategy
 
-> AI 驱动的量化策略自动生成工具。输入策略需求 → Agent 设计 → 代码生成 → 回测验证 → 自主优化。
+[![Python >= 3.11](https://img.shields.io/badge/python-%3E%3D3.11-blue.svg)](https://www.python.org/)
+[![Market](https://img.shields.io/badge/market-A%E8%82%A1%20%7C%20%E6%B8%AF%E8%82%A1%20%7C%20%E7%BE%8E%E8%82%A1-green.svg)]()
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-[![Skill](https://img.shields.io/badge/Skill-autostrategy-blue)](https://github.com/rivar0107/autostrategy)
-[![Market](https://img.shields.io/badge/Market-A%E8%82%A1%20%7C%20%E6%B8%AF%E8%82%A1%20%7C%20%E7%BE%8E%E8%82%A1-green)]()
-[![License](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
+用自然语言创建、回测和模拟运行量化策略的本地开源工具。
 
-> ⚠️ **免责声明**：本工具生成的策略仅供学习和研究用途，不构成任何投资建议。量化交易有风险，过往回测表现不代表未来收益。
+你描述一个想法，Autostrategy 帮你把它变成可检查的策略设计文档，再生成代码，跑回测，最后在本地模拟运行里观察它会如何做决策。
 
-## 快速开始（产品版）
+> 免责声明：本项目仅用于学习、研究和策略原型验证，不构成任何投资建议。量化交易有风险，回测收益不代表未来表现。
+
+## 为什么做这个
+
+很多个人投资者不是卡在“不会写 Python”，而是卡在更前面：
+
+- 想法说不清，策略条件散在脑子里。
+- 代码跑起来了，但不知道 AI 有没有偷偷改了逻辑。
+- 回测结果看起来不错，但不知道风险在哪里。
+- 想观察策略的逐步决策，却没有一个轻量的本地工作台。
+
+Autostrategy 的核心思路是：**先把策略写成清楚的设计文档，再让代码严格跟随文档。**
+
+这不是让 AI 直接自由发挥写一段交易脚本。它更像一个本地策略工坊：先画图纸，再施工，再验收。
+
+## 它能帮你做什么
+
+| 你想做的事 | Autostrategy 做什么 |
+|---|---|
+| “帮我做一个双均线策略” | 生成策略设计文档、策略代码和本地回测结果 |
+| “我有个模糊想法，但不知道怎么量化” | 把想法整理成买入、卖出、止损、仓位规则 |
+| “我想先从模板开始” | 用内置双均线、网格、动量模板创建策略工作区 |
+| “我想检查 AI 生成的策略有没有依据” | 保留 `STRATEGY_DESIGN.md`，让策略逻辑可读、可审查 |
+| “我想看策略每一步会怎么判断” | 本地模拟运行，保存决策事件和运行结果 |
+
+## 安装
+
+建议先在虚拟环境中使用：
 
 ```bash
-# 安装开发版
-pip install -e .
+git clone git@github.com:Zach0911/autostrategy.git
+cd autostrategy
 
-# 初始化本地配置，会创建 ~/.autostrategy/settings.yaml
-autostrategy config init
-
-# 配置 LLM。API key 不写入配置文件，只从环境变量读取
-autostrategy config set llm.provider openai
-autostrategy config set llm.model gpt-4o-mini
-export AUTOSTRATEGY_LLM_API_KEY="你的 API Key"
-
-# 创建策略工作区
-autostrategy strategy create dual-ma --template dual-ma
-
-# 查看策略路径
-autostrategy strategy paths dual-ma
-
-# 用自然语言生成 STRATEGY_DESIGN.md，需要已配置 LLM key
-autostrategy design create \
-  --prompt "帮我做一个 A 股双均线策略" \
-  --name dual-ma \
-  --template dual-ma
-
-# 从 STRATEGY_DESIGN.md 生成 strategy.py/config.yaml/README.md 等文件
-autostrategy codegen create dual-ma --force
-
-# 执行本地回测并生成 backtest/results/backtest_result.json
-autostrategy backtest run dual-ma
-
-# 查看策略状态，应从 draft/designed/coded 流转到 backtested
-autostrategy strategy show dual-ma
+python -m venv .venv
+source .venv/bin/activate
+pip install -e ".[all]"
 ```
 
-> `design create` 和 `codegen create` 会调用用户自己配置的 LLM Provider。开源项目不会内置 API key，也不会替用户付费。
-
-## 本地 Web / REST API / MCP（Phase 4A-4B）
-
-Phase 4A 将 autostrategy 从纯 CLI 扩展为本地 Agent 服务平台骨架：CLI、REST API、Dashboard 和 MCP 工具复用同一套 service layer。
-
-Phase 4B 将 Dashboard 升级为基于 **Ant Design 官方组件与默认主题** 的浏览器工作台。Web 端使用 React + Vite + TypeScript + `antd`，不引入 Tailwind、Bootstrap、shadcn/ui 或其他主题系统。
-
-### 安装 Phase 4A/4B 依赖
+如果你的 shell 对引号比较敏感，也可以用：
 
 ```bash
-# Python 侧：包含测试、API、Web Dashboard、MCP adapter
-pip install -e ".[dev,api,web,mcp]"
+pip install -e '.[all]'
+```
 
-# 前端侧：安装 Ant Design React 工作台依赖
+开发和测试时可安装：
+
+```bash
+pip install -e '.[dev,api,web,mcp]'
 npm install
-npm run build
 ```
-
-### 前端开发命令
-
-```bash
-# 开发服务器，仅用于前端迭代
-npm run dev
-
-# 构建到 src/autostrategy/web/static，由 autostrategy serve 托管
-npm run build
-
-# 运行前端测试
-npm test
-```
-
-### 启动本地服务
-
-```bash
-autostrategy serve --host 127.0.0.1 --port 8000
-```
-
-启动后可访问：
-
-| 地址 | 用途 |
-|------|------|
-| `http://127.0.0.1:8000/` | Ant Design 本地策略工作台 |
-| `http://127.0.0.1:8000/docs` | FastAPI OpenAPI 文档 |
-| `http://127.0.0.1:8000/api/v1/health` | 健康检查 |
-| `http://127.0.0.1:8000/api/v1/strategies` | 策略列表 API |
-| `http://127.0.0.1:8000/api/v1/templates` | 内置模板 API |
-
-也可以指定工作区：
-
-```bash
-autostrategy serve --workspace-root /path/to/strategies
-```
-
-> 默认仅建议监听 `127.0.0.1`。Phase 4A 是本地优先能力，不提供多用户鉴权和远程托管安全边界。
-
-### REST API 示例
-
-```bash
-# 健康检查
-curl http://127.0.0.1:8000/api/v1/health
-
-# 创建策略工作区
-curl -X POST http://127.0.0.1:8000/api/v1/strategies \
-  -H "Content-Type: application/json" \
-  -d '{"name":"phase4a-demo","market":"A股","template":"dual-ma"}'
-
-# 查看策略详情
-curl http://127.0.0.1:8000/api/v1/strategies/phase4a-demo
-
-# 查看策略 artifact 状态
-curl http://127.0.0.1:8000/api/v1/strategies/phase4a-demo/artifacts
-
-# 预览设计文档
-curl http://127.0.0.1:8000/api/v1/strategies/phase4a-demo/artifacts/design
-
-# 运行回测（需要 strategy.py 已存在）
-curl -X POST http://127.0.0.1:8000/api/v1/strategies/phase4a-demo/backtest
-
-# 启动模拟运行（需要 strategy.py 暴露 run_paper(config)）
-curl -X POST http://127.0.0.1:8000/api/v1/strategies/phase4a-demo/paper-run
-
-# 查看模拟运行结果
-curl http://127.0.0.1:8000/api/v1/strategies/phase4a-demo/paper-run-result
-```
-
-### Phase 5A — 模拟运行（Paper Run）
-
-Phase 5A 提供 **replay-first 模拟运行**：策略代码只需暴露 `run_paper(config)`，即可在本地按历史数据重放决策，并产出可审计的 paper run artifact。
-
-模拟运行会写入：
-
-- `paper_run/results/paper_run_result.json` — 当前状态、汇总指标、最新决策
-- `paper_run/results/paper_run_events.jsonl` — 逐笔决策审计流
-- `paper_run/logs/paper_run.log` — 运行日志
-
-> Phase 5A 还不是完整模拟盘：不做真实 broker、不做实时行情订阅、不做完整订单生命周期。它先把“本地 replay → 落盘 → 展示”的最小闭环跑通，为后续 Phase 5B 准实时运行打基础。
-
-### MCP 工具范围
-
-Phase 4A 提供保守的 MCP adapter，主要用于本地 Agent 读取策略状态和触发低风险操作：
-
-- `list_strategies`
-- `get_strategy`
-- `get_strategy_paths`
-- `list_templates`
-- `get_backtest_result`
-- `create_strategy`
-- `run_backtest`
-
-暂不开放 `design_strategy` / `codegen_strategy` 作为 MCP 工具，避免其他 Agent 自动形成“生成代码 → 执行代码”的高风险链路。
-
-### Phase 4A 安全边界
-
-- API/MCP 只能通过 strategy slug 访问当前 workspace 内文件。
-- `Workspace` 会拒绝 `../`、绝对路径等 path traversal。
-- `CodegenAgent` 会拒绝明显危险的生成代码模式，例如 `os.system`、`subprocess`、`eval(`、`exec(`。
-- 回测仍会在本地执行策略代码；这是本地研究工具，不是远程沙箱服务。
-
-## 它能做什么？
-
-| 入口 | 你说 | 它做 |
-|------|------|------|
-| **明确需求** | "帮我设计一个双均线交叉策略" | 直接分析 → 设计文档 → 代码 + 回测 |
-| **模糊需求** | "我想做A股量化，但不确定用什么方法" | 诊断推荐 → 选方向 → 生成策略 |
-| **博主策略** | "按某大V的投资逻辑做个策略" | 互联网研究 → 提炼逻辑 → 量化策略 |
-| **优化迭代** | "优化这个策略的回测结果" | 诊断弱点 → 5轮自主优化 → 输出报告 |
-
-## 核心设计
-
-### 文档驱动
-
-**STRATEGY_DESIGN.md 是「系统施工图纸」** — 所有策略逻辑先落在设计文档上，代码只是文档的严格翻译产物。
-
-```
-用户需求 → STRATEGY_DESIGN.md（精确规格）→ strategy.py（严格翻译）→ 回测验证
-```
-
-这意味着：AI 不会「自由发挥」，每行代码都有文档对应；修改策略时改文档，代码跟随更新。
-
-### Agent 化工作流
-
-Autostrategy 采用**多 Agent 串联**架构，用户只需在 3 个关键审批点参与决策：
-
-```
-用户输入
-    ↓
-┌─────────────────┐  Phase 1: 策略设计 Agent
-│  设计 Agent      │  → 产出 STRATEGY_DESIGN.md
-│  (design_agent)  │
-└────────┬────────┘
-         ↓ ⏸ 审批点 1：确认设计文档
-┌─────────────────┐  Phase 2: 代码生成 Agent
-│  代码 Agent      │  → 产出 strategy.py + 回测报告
-│  (codegen_agent) │
-└────────┬────────┘
-         ↓ ⏸ 审批点 2：确认回测结果
-┌─────────────────┐  Phase 3: 优化 Agent（自主/交互式）
-│  优化 Agent      │  → 产出优化报告
-│  (optimization)  │
-└────────┬────────┘
-         ↓ ⏸ 审批点 3：最终决策（接受 / 重做 / 回 Phase 1）
-```
-
-- **文件驱动状态转移**：STRATEGY_DESIGN.md → strategy.py → backtest_result.json → changelog.md
-- **棘轮决策**：每次优化用 `score_strategy()` 评分，有效保留、无效回滚
-
-## 适用市场
-
-| 市场 | 数据源 | 交易规则 |
-|------|--------|---------|
-| **A股** | [FTShare](https://github.com/rivar0107/all-in-one)（免费） | T+1，涨跌停 ±10%/±20% |
-| **港股** | FutuAPI（需 Futu OpenD） | T+0，无涨跌停 |
-| **美股** | FutuAPI（需 Futu OpenD） | T+0，PDT 规则 |
-
-> 期货、期权暂不支持，后续版本逐步加入。
 
 ## 快速开始
 
-### 安装
+### 1. 初始化配置
 
 ```bash
-npx skills add rivar0107/autostrategy --yes
+autostrategy config init
 ```
 
-安装后在 Claude Code / Gemini CLI / Copilot CLI 中直接使用，无需额外配置。
+这会创建本地配置文件：
 
-### 环境准备（可选）
+```text
+~/.autostrategy/settings.yaml
+```
+
+### 2. 配置 LLM
+
+Autostrategy 使用 OpenAI-compatible 接口。API key 不写入项目文件，只从环境变量读取。
 
 ```bash
-pip install numpy pandas pyyaml
+autostrategy config set llm.provider openai
+autostrategy config set llm.model gpt-4o-mini
+export AUTOSTRATEGY_LLM_API_KEY="你的 API Key"
 ```
 
-- **A股数据**：安装 [ftshare-all-in-one](https://github.com/rivar0107/all-in-one) Skill（免费）
-- **港美股数据**：安装 FutuAPI Skill（需 [Futu OpenD](https://www.futunn.com/download/openAPI)）
+如果你只想体验模板和本地回测，可以先不配置 LLM。
 
-### 使用示例
+### 3. 创建一个策略
 
-```
-"帮我设计一个双均线交叉策略"
-"我想做一个港股量化策略，但不清楚用什么方法"
-"帮我根据某大V在微博上的投资观点做个量化策略"
-"优化这个策略的回测结果，降低最大回撤"
+用内置模板创建：
+
+```bash
+autostrategy strategy create dual-ma --template dual-ma
 ```
 
-## 项目结构
+查看策略文件位置：
 
-```
-autostrategy/
-├── pyproject.toml                     # Python 包定义与 CLI 入口
-├── VERSION                            # 当前版本
-├── CHANGELOG.md                       # 版本变更记录
-├── TODOS.md                           # 项目待办与已完成事项
-├── SKILL.md                           # 兼容旧 Skill 安装路径的 shim
-├── src/autostrategy/
-│   ├── cli/main.py                    # Typer CLI
-│   ├── api/                           # FastAPI REST API
-│   │   ├── app.py
-│   │   ├── routers/                   # strategies / design / codegen / backtest / paper_run / artifacts / config / health
-│   │   ├── schemas.py
-│   │   └── dependencies.py
-│   ├── services/                      # 业务 service layer
-│   │   ├── strategy_service.py
-│   │   ├── design_service.py
-│   │   ├── codegen_service.py
-│   │   ├── backtest_service.py
-│   │   ├── backtest_job_service.py
-│   │   ├── paper_run_service.py
-│   │   ├── paper_run_job_service.py
-│   │   └── artifact_service.py
-│   ├── mcp/                           # MCP adapter
-│   │   ├── server.py
-│   │   └── tools.py
-│   ├── web/                           # Ant Design React 工作台
-│   │   └── frontend/
-│   │       ├── src/App.tsx
-│   │       └── ...
-│   ├── config.py                      # 本地配置与 LLM Provider 配置
-│   ├── llm/client.py                  # OpenAI-compatible LLM Client
-│   ├── agents/
-│   │   ├── design_agent.py            # 自然语言 → STRATEGY_DESIGN.md
-│   │   └── codegen_agent.py           # STRATEGY_DESIGN.md → strategy.py/config/README
-│   ├── core/
-│   │   ├── strategy.py                # Strategy 领域模型与状态
-│   │   ├── workspace.py               # 策略工作区 CRUD 与文件 API
-│   │   ├── template_registry.py       # 内置模板市场
-│   │   └── backtest_engine.py         # 可导入的产品化回测引擎 + paper run workflow
-│   └── templates/                     # dual-ma / grid / momentum 模板
-├── .claude/skills/autostrategy/       # Claude Code Skill 兼容层
-│   └── prompts/                       # 原 Skill prompts
-├── scripts/
-│   ├── env_setup.py                   # 环境检查与依赖安装
-│   ├── quality_check.py               # 旧版策略设计文档质量检查
-│   └── run_backtest.py                # 兼容脚本入口
-├── examples/
-│   └── dynamic-grid-multi-market/     # 示例：动态网格多标的策略
-├── docs/superpowers/                  # 产品化设计文档与计划
-└── tests/                             # unit / integration 测试
+```bash
+autostrategy strategy paths dual-ma
 ```
 
-## 示例策略
+### 4. 用自然语言生成策略设计
 
-内置「动态网格多标的」策略示例，覆盖 5 个跨市场标的（腾讯、科创50ETF、中证2000ETF、小鹏、特斯拉）。
+```bash
+autostrategy design create \
+  --prompt "帮我做一个 A 股双均线策略，快线上穿慢线买入，跌破慢线卖出，并控制最大仓位" \
+  --name dual-ma \
+  --template dual-ma
+```
 
-2024-2025 回测：年化收益 11.99%，最大回撤 30.47%，夏普 0.49，胜率 75.2%。
+生成后重点看这个文件：
 
-## 评估与设计原则
+```text
+STRATEGY_DESIGN.md
+```
 
-**评分函数**：5 个维度共 100 分 + 简洁性惩罚（条件数 > 10 时每个扣 1.5 分）。
+它是策略图纸。买入条件、卖出条件、止损、仓位管理都应该在这里说清楚。
 
-| 维度 | 满分 | 满分条件 | 设计原则 |
-|------|------|---------|---------|
-| 年化收益率 | 25 | > 基准×2（沪深300 8% / 恒生 5% / 标普 10%）| 简洁性优先：分数提升必须大于复杂度增加 |
-| 最大回撤 | 20 | < 10%（回撤≥30%得0分）| 文档是核心：所有逻辑先写入 DESIGN.md |
-| 夏普比率 | 25 | > 2.0 | 人在回路：设计文档和回测结果人类确认 |
-| 胜率 | 15 | > 60% | 量化评估：用 score_strategy() 决定 keep/revert |
-| 盈亏比 | 15 | > 2.5 | 不推实盘：定位是策略创建和验证工具 |
+### 5. 生成代码
 
-同时检测：过拟合、幸存者偏差、未来函数、流动性、前后半段稳定性。
+```bash
+autostrategy codegen create dual-ma --force
+```
 
-## 技术栈
+生成的策略工作区会包含：
 
-- **语言**：Python 3.11+
-- **CLI**：Typer
-- **配置/数据模型**：Pydantic + PyYAML
-- **数据处理**：NumPy, Pandas
-- **回测**：函数式 `run_backtest(config)` 优先，兼容 Backtrader Strategy class
-- **数据源**：[FTShare](https://github.com/rivar0107/all-in-one)（A股）、FutuAPI（港美股）、akshare/yfinance 等可扩展源
-- **LLM Provider**：OpenAI-compatible，本地读取用户环境变量中的 API key
-- **AI Agent 兼容**：Claude Code, Gemini CLI, Copilot CLI, Codex, Cline 等
+```text
+strategy.py
+config.yaml
+README.md
+requirements.txt
+fetch_data.py
+```
+
+### 6. 回测
+
+```bash
+autostrategy backtest run dual-ma
+```
+
+回测结果会保存到策略工作区：
+
+```text
+backtest/results/backtest_result.json
+```
+
+查看策略当前状态：
+
+```bash
+autostrategy strategy show dual-ma
+```
+
+## 浏览器工作台
+
+如果你不想一直在命令行里看文件，可以启动本地工作台：
+
+```bash
+npm run build
+autostrategy serve --host 127.0.0.1 --port 8000
+```
+
+打开：
+
+```text
+http://127.0.0.1:8000/
+```
+
+你可以在浏览器里查看策略、生成设计、触发代码生成、运行回测、预览产物，并查看 LLM 配置状态。
+
+建议只监听 `127.0.0.1`。Autostrategy 是本地研究工具，不是多用户远程服务。
+
+## 模拟运行
+
+回测回答的是：“这套规则在历史数据上表现如何？”
+
+模拟运行回答的是：“如果按时间顺序重放，策略每一步会怎么做决策？”
+
+策略代码只要暴露：
+
+```python
+def run_paper(config):
+    ...
+```
+
+就可以启动模拟运行：
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/v1/strategies/dual-ma/paper-run
+```
+
+结果会写入：
+
+```text
+paper_run/results/paper_run_result.json
+paper_run/results/paper_run_events.jsonl
+paper_run/logs/paper_run.log
+```
+
+当前模拟运行是 replay-first，本地重放历史数据和策略决策。它还不是实盘交易，也不连接真实 broker。
+
+## 工作流
+
+```text
+Describe  →  Design  →  Generate  →  Backtest  →  Paper Run  →  Iterate
+想法          图纸        代码          回测          模拟观察        继续改进
+```
+
+1. **Describe**：用自然语言描述策略。
+2. **Design**：生成可审查的策略设计文档。
+3. **Generate**：根据设计文档生成策略代码。
+4. **Backtest**：在本地跑历史回测。
+5. **Paper Run**：重放策略决策，查看事件流和运行结果。
+6. **Iterate**：修改设计，再生成、再验证。
+
+## 内置模板
+
+当前内置三个策略模板：
+
+| 模板 | 适合场景 |
+|---|---|
+| `dual-ma` | 双均线趋势跟随，新手最容易理解 |
+| `grid` | 震荡行情里的网格思路 |
+| `momentum` | 动量策略原型 |
+
+查看模板列表：
+
+```bash
+autostrategy strategy create --help
+```
+
+## 支持市场
+
+Autostrategy 的设计目标覆盖：
+
+| 市场 | 状态 | 说明 |
+|---|---|---|
+| A 股 | 优先支持 | 适合个人投资者研究和验证想法 |
+| 港股 | 规划支持 | 可通过 Futu OpenD 等数据源扩展 |
+| 美股 | 规划支持 | 可通过 Futu OpenD、yfinance 等数据源扩展 |
+
+数据源不是强绑定的。策略工作区可以按自己的方式提供历史数据，只要 `strategy.py` 暴露约定入口即可。
+
+## 安全边界
+
+Autostrategy 会尽量降低 AI 生成代码的风险：
+
+- API key 只从环境变量读取，不写入项目配置。
+- 生成代码会拒绝明显危险的模式，例如 `os.system`、`subprocess`、`eval(`、`exec(`。
+- 工作区文件访问会阻止 `../` 和绝对路径穿越。
+- 回测和模拟运行默认在本地执行，不提供远程多用户沙箱。
+
+这仍然是一个会执行本地策略代码的研究工具。运行第三方策略前，请先读代码。
+
+## 命令速查
+
+```bash
+# 配置
+autostrategy config init
+autostrategy config show
+autostrategy config set llm.model gpt-4o-mini
+
+# 策略管理
+autostrategy strategy create dual-ma --template dual-ma
+autostrategy strategy list
+autostrategy strategy show dual-ma
+autostrategy strategy paths dual-ma
+
+# AI 工作流
+autostrategy design create --prompt "帮我做一个双均线策略" --name dual-ma
+autostrategy codegen create dual-ma --force
+
+# 验证
+autostrategy backtest run dual-ma
+
+# 本地工作台
+autostrategy serve --host 127.0.0.1 --port 8000
+```
+
+## 给开发者
+
+常用验证命令：
+
+```bash
+python -m pytest
+npm test -- --run
+npm run build
+npm run typecheck
+```
+
+项目主要目录：
+
+```text
+src/autostrategy/
+├── cli/          # 命令行入口
+├── agents/       # 设计与代码生成 Agent
+├── core/         # 策略、工作区、模板、回测核心
+├── services/     # 业务服务层
+├── api/          # 本地 API
+├── web/          # 本地浏览器工作台
+├── mcp/          # 本地 Agent 工具适配
+└── templates/    # 内置策略模板
+```
+
+更详细的产品设计和阶段计划在 [docs/superpowers/](docs/superpowers/) 中。
 
 ## 相关项目
 
+- [VibeTrading](https://github.com/VibeTradingLabs/vibetrading) — Agent-first trading framework for cryptocurrency
 - [all-in-one](https://github.com/rivar0107/all-in-one) — 免费的 A 股/港股行情数据 Skill
 - [darwin-skill](https://github.com/alchaincyf/darwin-skill) — AI Skill 持续优化框架
 

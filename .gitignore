@@ -41,3 +41,4 @@ completed/
 .claude/settings.json
 .claude/CLAUDE.md
 .claude/worktrees/
+node_modules
