@@ -303,12 +303,6 @@ src/autostrategy/
 
 更详细的产品设计和阶段计划在 [docs/superpowers/](docs/superpowers/) 中。
 
-## 相关项目
-
-- [VibeTrading](https://github.com/VibeTradingLabs/vibetrading) — Agent-first trading framework for cryptocurrency
-- [all-in-one](https://github.com/rivar0107/all-in-one) — 免费的 A 股/港股行情数据 Skill
-- [darwin-skill](https://github.com/alchaincyf/darwin-skill) — AI Skill 持续优化框架
-
 ## License
 
 MIT License

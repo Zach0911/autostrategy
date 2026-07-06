@@ -219,6 +219,13 @@ function App() {
       try {
         const nextJob = await api.paperRunJob(selected.slug, paperRunJob.job_id)
         setPaperRunJob(nextJob)
+        if (nextJob.status === 'running') {
+          try {
+            setPaperRunResult(await api.paperRunResult(selected.slug))
+          } catch {
+            setPaperRunResult(null)
+          }
+        }
         if (nextJob.status === 'succeeded' || nextJob.status === 'stopped') {
           messageApi.success(paperRunJobMessage(nextJob))
           const result = await api.paperRunResult(selected.slug)
@@ -228,6 +235,11 @@ function App() {
         }
         if (nextJob.status === 'failed' || nextJob.status === 'timed_out') {
           messageApi.error(paperRunJobMessage(nextJob))
+          try {
+            setPaperRunResult(await api.paperRunResult(selected.slug))
+          } catch {
+            setPaperRunResult(null)
+          }
         }
       } catch (err) {
         messageApi.error(errorMessage(err))
