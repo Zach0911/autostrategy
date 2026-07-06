@@ -23,6 +23,6 @@
 
 ## Completed
 
-- **Phase 4A 本地 API + MCP** — Completed: v0.1.0.0 (2026-07-05)
-- **Phase 4B Ant Design Web 工作台 + LLM 配置安全** — Completed: v0.1.0.0 (2026-07-05)
-- **Phase 5A replay-first paper run 最小闭环** — Completed: v0.1.0.0 (2026-07-05)
+- **本地 API + MCP 工具接口** — Completed: v0.1.0.0 (2026-07-05)
+- **Ant Design 浏览器工作台 + LLM 配置安全** — Completed: v0.1.0.0 (2026-07-05)
+- **replay-first 模拟运行最小闭环** — Completed: v0.1.0.0 (2026-07-05)

@@ -72,10 +72,10 @@ all = [
 autostrategy = "autostrategy.cli.main:app"
 
 [project.urls]
-Homepage = "https://github.com/rivar0107/autostrategy"
-Documentation = "https://github.com/rivar0107/autostrategy#readme"
-Repository = "https://github.com/rivar0107/autostrategy"
-Issues = "https://github.com/rivar0107/autostrategy/issues"
+Homepage = "https://github.com/Zach0911/autostrategy"
+Documentation = "https://github.com/Zach0911/autostrategy#readme"
+Repository = "https://github.com/Zach0911/autostrategy"
+Issues = "https://github.com/Zach0911/autostrategy/issues"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/autostrategy"]
