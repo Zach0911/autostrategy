@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import multiprocessing as mp
 import queue
 import threading
@@ -112,16 +113,20 @@ class PaperRunJobService:
             process.join(self.timeout_seconds)
 
             if process.is_alive():
+                paths = self.strategy_service.get_strategy_paths(slug)
                 process.terminate()
                 process.join(5)
                 if process.is_alive():
                     process.kill()
                     process.join()
+                error = f"Paper run timed out after {self.timeout_seconds} seconds."
+                self._write_timeout_result(paths.paper_run_result, error)
                 self._update_job(
                     job_id,
                     status="timed_out",
                     finished_at=_utc_now(),
-                    error=f"Paper run timed out after {self.timeout_seconds} seconds.",
+                    result_path=paths.paper_run_result,
+                    error=error,
                 )
                 return
 
@@ -171,3 +176,25 @@ class PaperRunJobService:
             self._jobs[job_id] = BacktestJob(**data)
             if data["status"] in _TERMINAL_STATUSES:
                 self._stop_events.pop(job_id, None)
+
+    def _write_timeout_result(self, result_path: Path, error: str) -> None:
+        started_at = _utc_now()
+        result = {
+            "mode": "paper_run",
+            "run_status": "timed_out",
+            "started_at": started_at,
+            "updated_at": started_at,
+            "replay": {"current_at": None, "bars_processed": 0, "progress": 0.0},
+            "summary": {
+                "paper_return": 0.0,
+                "paper_max_drawdown": 0.0,
+                "trade_count": 0,
+                "position_count": 0,
+                "final_value": 0.0,
+            },
+            "latest_decision": None,
+            "diagnostics": [{"item": "paper_run", "status": "❌", "detail": error}],
+            "error": error,
+        }
+        result_path.parent.mkdir(parents=True, exist_ok=True)
+        result_path.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")

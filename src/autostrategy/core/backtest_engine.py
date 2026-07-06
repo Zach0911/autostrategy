@@ -7,8 +7,11 @@ import importlib.util
 import json
 import re
 import sys
+from collections.abc import Iterable
 from datetime import UTC, datetime
 from pathlib import Path
+from time import sleep
+from typing import Any
 
 import numpy as np
 import yaml
@@ -213,20 +216,141 @@ def run_paper_replay_workflow(strategy_dir: Path, stop_requested=None) -> dict:
         _write_paper_artifacts(result_path, events_path, log_path, result, [])
         return result
 
-    if not isinstance(raw, dict):
-        result = _paper_failed_result(started_at, "run_paper() 必须返回 dict")
+    try:
+        result = _run_incremental_paper_replay(
+            raw,
+            started_at,
+            result_path,
+            events_path,
+            log_path,
+            stop_requested=stop_requested,
+        )
+    except Exception as exc:
+        result = _paper_failed_result(started_at, f"replay 执行失败: {exc}")
+        _write_paper_artifacts(result_path, events_path, log_path, result, [])
+    return result
+
+
+def _run_incremental_paper_replay(
+    raw: Any,
+    started_at: str,
+    result_path: Path,
+    events_path: Path,
+    log_path: Path,
+    stop_requested=None,
+) -> dict:
+    if isinstance(raw, dict):
+        return _finish_static_paper_replay(raw, started_at, result_path, events_path, log_path, stop_requested)
+    if isinstance(raw, str | bytes) or not isinstance(raw, Iterable):
+        result = _paper_failed_result(started_at, "run_paper() 必须返回 dict 或可迭代 replay 事件")
         _write_paper_artifacts(result_path, events_path, log_path, result, [])
         return result
 
+    events: list[dict] = []
+    final_raw: dict = {}
+    result = _paper_result_from_raw(
+        {"events": events, "replay": {"bars_processed": 0, "progress": 0.0}},
+        started_at,
+        run_status="running",
+    )
+    _write_paper_artifacts(result_path, events_path, log_path, result, events)
+
+    for item in raw:
+        if stop_requested and stop_requested():
+            result = _paper_result_from_raw(_raw_with_events(final_raw, events), started_at, run_status="stopped")
+            _write_paper_artifacts(result_path, events_path, log_path, result, events)
+            return result
+
+        if not isinstance(item, dict):
+            result = _paper_failed_result(started_at, "replay 事件必须是 dict")
+            _write_paper_artifacts(result_path, events_path, log_path, result, events)
+            return result
+
+        if _looks_like_event(item):
+            events.append(item)
+            final_raw = _merge_replay_event(final_raw, item, events)
+        else:
+            final_raw = _merge_replay_snapshot(final_raw, item, events)
+            events = _paper_events_from_raw(final_raw)
+
+        result = _paper_result_from_raw(_raw_with_events(final_raw, events), started_at, run_status="running")
+        _write_paper_artifacts(result_path, events_path, log_path, result, events)
+        sleep(float(final_raw.get("replay_interval_seconds", 0) or 0))
+
+    if "error" in final_raw:
+        result = _paper_failed_result(started_at, str(final_raw["error"]), _raw_with_events(final_raw, events))
+    elif stop_requested and stop_requested():
+        result = _paper_result_from_raw(_raw_with_events(final_raw, events), started_at, run_status="stopped")
+    else:
+        result = _paper_result_from_raw(_raw_with_events(final_raw, events), started_at, run_status="completed")
+    _write_paper_artifacts(result_path, events_path, log_path, result, events)
+    return result
+
+
+def _finish_static_paper_replay(
+    raw: dict,
+    started_at: str,
+    result_path: Path,
+    events_path: Path,
+    log_path: Path,
+    stop_requested=None,
+) -> dict:
     if stop_requested and stop_requested():
         result = _paper_result_from_raw(raw, started_at, run_status="stopped")
     elif "error" in raw:
         result = _paper_failed_result(started_at, str(raw["error"]), raw)
     else:
         result = _paper_result_from_raw(raw, started_at, run_status="completed")
-
     _write_paper_artifacts(result_path, events_path, log_path, result, _paper_events_from_raw(raw))
     return result
+
+
+def _looks_like_event(item: dict) -> bool:
+    return any(key in item for key in {"timestamp", "action", "symbol", "price", "size", "reason"})
+
+
+def _merge_replay_event(raw: dict, event: dict, events: list[dict]) -> dict:
+    merged = dict(raw)
+    replay = dict(merged.get("replay") if isinstance(merged.get("replay"), dict) else {})
+    replay["bars_processed"] = int(replay.get("bars_processed", 0) or 0) + 1
+    if event.get("timestamp") is not None:
+        replay["current_at"] = event["timestamp"]
+    if event.get("progress") is not None:
+        replay["progress"] = event["progress"]
+    merged["replay"] = replay
+    merged["latest_decision"] = event
+    merged["events"] = events
+    return merged
+
+
+def _merge_replay_snapshot(raw: dict, snapshot: dict, events: list[dict]) -> dict:
+    merged = dict(raw)
+    for key, value in snapshot.items():
+        if key == "events" and isinstance(value, list):
+            merged[key] = value
+        elif key == "replay" and isinstance(value, dict):
+            replay = dict(merged.get("replay") if isinstance(merged.get("replay"), dict) else {})
+            replay.update(value)
+            merged[key] = replay
+        elif key == "paper" and isinstance(value, dict):
+            paper = dict(merged.get("paper") if isinstance(merged.get("paper"), dict) else {})
+            paper.update(value)
+            merged[key] = paper
+        elif key == "summary" and isinstance(value, dict):
+            summary = dict(merged.get("summary") if isinstance(merged.get("summary"), dict) else {})
+            summary.update(value)
+            merged[key] = summary
+        else:
+            merged[key] = value
+    if "events" not in merged:
+        merged["events"] = events
+    return merged
+
+
+def _raw_with_events(raw: dict, events: list[dict]) -> dict:
+    merged = dict(raw)
+    merged["events"] = events
+    return merged
 
 
 def _utc_now() -> str:

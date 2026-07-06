@@ -264,6 +264,61 @@ test('shows submitted paper run status', async () => {
   expect(await screen.findByText('模拟运行任务：running')).toBeInTheDocument()
 })
 
+test('refreshes paper run result while job is running', async () => {
+  let resultCalls = 0
+  vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+    if (url.endsWith('/config')) {
+      return jsonResponse(readyConfig)
+    }
+    if (url.endsWith('/strategies/demo/artifacts')) {
+      return jsonResponse({ slug: 'demo', artifacts: [] })
+    }
+    if (url.endsWith('/strategies/demo/backtest-result')) {
+      return jsonResponse({ error: { code: 'backtest_error', message: 'missing', details: {} } }, 400)
+    }
+    if (url.endsWith('/strategies/demo/paper-run-result')) {
+      resultCalls += 1
+      return jsonResponse({
+        strategy: { name: 'demo', slug: 'demo', description: '', market: 'A股', status: 'paper_running', tags: [] },
+        result_path: '/tmp/paper_run_result.json',
+        result: {
+          mode: 'paper_run',
+          run_status: 'running',
+          replay: { current_at: '2024-01-03', bars_processed: 2, progress: 0.5 },
+          summary: { paper_return: 0, paper_max_drawdown: 0, trade_count: 1, final_value: 1000000 },
+          latest_decision: { action: 'hold', reason: 'waiting' },
+        },
+      })
+    }
+    if (url.endsWith('/strategies/demo/paper-run')) {
+      return jsonResponse({ job_id: 'paper-job-1', slug: 'demo', status: 'running', created_at: '2026-07-05T00:00:00Z' }, 202)
+    }
+    if (url.includes('/strategies/demo/paper-run-jobs/')) {
+      return jsonResponse({ job_id: 'paper-job-1', slug: 'demo', status: 'running', created_at: '2026-07-05T00:00:00Z' })
+    }
+    if (url.endsWith('/strategies/demo')) {
+      return jsonResponse({ strategy: { name: 'demo', slug: 'demo', description: '', market: 'A股', status: 'coded', tags: [] }, paths: {} })
+    }
+    if (url.endsWith('/strategies')) {
+      return jsonResponse([{ name: 'demo', slug: 'demo', description: '', market: 'A股', status: 'coded', tags: [] }])
+    }
+    if (url.endsWith('/templates')) {
+      return jsonResponse(['dual-ma'])
+    }
+    return jsonResponse({ status: 'ok' })
+  }))
+  const user = userEvent.setup()
+
+  render(<App />)
+
+  await user.click(await screen.findByText('查看详情'))
+  await user.click(await screen.findByText('启动模拟运行'))
+  await waitFor(() => expect(resultCalls).toBeGreaterThan(1), { timeout: 1500 })
+
+  expect(await screen.findByText('hold')).toBeInTheDocument()
+  expect(screen.getByText('2024-01-03')).toBeInTheDocument()
+})
+
 test('ordinary non-LLM failures do not open setup modal', async () => {
   vi.stubGlobal('fetch', vi.fn(async (url: string) => {
     if (url.endsWith('/config')) {

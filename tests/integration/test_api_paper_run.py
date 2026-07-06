@@ -69,8 +69,9 @@ def test_api_paper_run_stop_request_reaches_stopped_job(tmp_path):
     (tmp_path / "demo" / "strategy.py").write_text(
         "import time\n"
         "def run_paper(config):\n"
-        "    time.sleep(0.2)\n"
-        "    return {'paper': {'initial_cash': 1000000, 'final_value': 1005000}, 'events': []}\n",
+        "    for index in range(5):\n"
+        "        time.sleep(0.05)\n"
+        "        yield {'timestamp': f'2024-01-0{index + 1}', 'action': 'hold', 'progress': (index + 1) / 5}\n",
         encoding="utf-8",
     )
     (tmp_path / "demo" / "config.yaml").write_text("market: A股\ninitial_cash: 1000000\n", encoding="utf-8")
@@ -85,3 +86,40 @@ def test_api_paper_run_stop_request_reaches_stopped_job(tmp_path):
 
     job = _wait_for_job(client, "demo", job_id)
     assert job["status"] == "stopped"
+    result = client.get("/api/v1/strategies/demo/paper-run-result")
+    assert result.status_code == 200
+    assert result.json()["result"]["run_status"] == "stopped"
+
+
+def test_api_paper_run_exposes_running_partial_result(tmp_path):
+    client = TestClient(create_app(workspace_root=tmp_path))
+    create = client.post("/api/v1/strategies", json={"name": "demo"})
+    assert create.status_code == 200
+    (tmp_path / "demo" / "strategy.py").write_text(
+        "import time\n"
+        "def run_paper(config):\n"
+        "    yield {'timestamp': '2024-01-02', 'action': 'buy', 'progress': 0.5}\n"
+        "    time.sleep(0.2)\n"
+        "    yield {'paper': {'initial_cash': 1000000, 'final_value': 1010000}, 'replay': {'progress': 1.0}}\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "demo" / "config.yaml").write_text("market: A股\ninitial_cash: 1000000\n", encoding="utf-8")
+
+    run = client.post("/api/v1/strategies/demo/paper-run")
+    assert run.status_code == 202
+    job_id = run.json()["job_id"]
+
+    deadline = time.monotonic() + 2
+    partial = None
+    while time.monotonic() < deadline:
+        result = client.get("/api/v1/strategies/demo/paper-run-result")
+        if result.status_code == 200 and result.json()["result"]["run_status"] == "running":
+            partial = result.json()["result"]
+            break
+        time.sleep(0.02)
+
+    assert partial is not None
+    assert partial["replay"]["progress"] == 0.5
+    assert partial["latest_decision"]["action"] == "buy"
+    job = _wait_for_job(client, "demo", job_id)
+    assert job["status"] == "succeeded"
