@@ -10,7 +10,16 @@ from fastapi.staticfiles import StaticFiles
 
 from autostrategy import __version__
 from autostrategy.api.errors import register_error_handlers
-from autostrategy.api.routers import artifacts, backtest, codegen, config, design, health, paper_run, strategies
+from autostrategy.api.routers import (
+    artifacts,
+    backtest,
+    codegen,
+    config,
+    design,
+    health,
+    paper_run,
+    strategies,
+)
 from autostrategy.services.backtest_job_service import BacktestJobService
 from autostrategy.services.paper_run_job_service import PaperRunJobService
 

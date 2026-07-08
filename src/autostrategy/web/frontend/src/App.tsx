@@ -37,6 +37,7 @@ import type {
   ConfigResponse,
   LlmConfigUpdate,
   PaperRunResponse,
+  PaperPosition,
   Strategy,
 } from './types'
 import './App.css'
@@ -713,8 +714,17 @@ function PaperRunSummary({ result }: { result: PaperRunResponse | null }) {
   }
   const payload = result.result || {}
   const summary = payload.summary || {}
+  const account = payload.account
+  const feed = payload.feed
   const replay = payload.replay || {}
   const latestDecision = payload.latest_decision
+  const positionColumns: ColumnsType<PaperPosition> = [
+    { title: '标的', dataIndex: 'symbol', key: 'symbol' },
+    { title: '数量', dataIndex: 'quantity', key: 'quantity', render: (value) => formatMetric(value) },
+    { title: '成本价', dataIndex: 'avg_price', key: 'avg_price', render: (value) => formatMetric(value) },
+    { title: '市值', dataIndex: 'market_value', key: 'market_value', render: (value) => formatMetric(value) },
+    { title: '浮动盈亏', dataIndex: 'unrealized_pnl', key: 'unrealized_pnl', render: (value) => formatMetric(value) },
+  ]
   return (
     <Card title={<Space><span>模拟运行摘要</span><Tag color="cyan">Paper Run</Tag><Tag>{payload.run_status || 'unknown'}</Tag></Space>}>
       <Row gutter={[16, 16]}>
@@ -723,12 +733,35 @@ function PaperRunSummary({ result }: { result: PaperRunResponse | null }) {
         <Col span={6}><Statistic title="交易次数" value={formatMetric(summary.trade_count)} /></Col>
         <Col span={6}><Statistic title="最终资产" value={formatMetric(summary.final_value)} /></Col>
       </Row>
+      {account && (
+        <>
+          <Row gutter={[16, 16]} className="mt-16">
+            <Col span={6}><Statistic title="现金" value={formatMetric(account.cash)} /></Col>
+            <Col span={6}><Statistic title="权益" value={formatMetric(account.equity)} /></Col>
+            <Col span={6}><Statistic title="已实现盈亏" value={formatMetric(account.realized_pnl)} /></Col>
+            <Col span={6}><Statistic title="未实现盈亏" value={formatMetric(account.unrealized_pnl)} /></Col>
+          </Row>
+          <Table
+            className="mt-16"
+            rowKey="symbol"
+            columns={positionColumns}
+            dataSource={account.positions || []}
+            pagination={false}
+            size="small"
+            locale={{ emptyText: <Empty description="暂无持仓" /> }}
+          />
+        </>
+      )}
       <Progress percent={Math.round((replay.progress || 0) * 100)} className="mt-16" />
       <Descriptions bordered column={2} className="mt-16" size="small">
         <Descriptions.Item label="当前时间">{replay.current_at || 'N/A'}</Descriptions.Item>
         <Descriptions.Item label="已处理 bars">{formatMetric(replay.bars_processed)}</Descriptions.Item>
         <Descriptions.Item label="最近动作">{latestDecision?.action || 'N/A'}</Descriptions.Item>
         <Descriptions.Item label="原因">{latestDecision?.reason || 'N/A'}</Descriptions.Item>
+        {feed && <Descriptions.Item label="数据源">{feed.source}</Descriptions.Item>}
+        {feed && <Descriptions.Item label="数据范围">{feed.start || 'N/A'} → {feed.end || 'N/A'}</Descriptions.Item>}
+        {feed && <Descriptions.Item label="标的数量">{formatMetric(feed.symbol_count)}</Descriptions.Item>}
+        {feed && <Descriptions.Item label="Bar 数量">{formatMetric(feed.bar_count)}</Descriptions.Item>}
       </Descriptions>
     </Card>
   )

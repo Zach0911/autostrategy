@@ -78,9 +78,7 @@ class DesignAgent:
         report = DesignQualityCheck.check(design_text)
         if not report.passed:
             workspace.delete_strategy(strategy.slug)
-            raise ValueError(
-                f"Generated design failed quality check: {'; '.join(report.errors)}"
-            )
+            raise ValueError(f"Generated design failed quality check: {'; '.join(report.errors)}")
 
         design_path = workspace._strategy_dir(strategy.slug) / "STRATEGY_DESIGN.md"
         design_path.write_text(design_text, encoding="utf-8")

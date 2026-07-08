@@ -6,15 +6,14 @@ API keys should be stored via keyring or environment variables, not in this file
 
 from __future__ import annotations
 
-from pathlib import Path
 import os
+from pathlib import Path
 from typing import Literal
 
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from autostrategy import __version__
-
 
 DEFAULT_PROVIDER: Literal[
     "openai", "deepseek", "kimi", "qwen", "zai", "minimax", "gemini", "local"
@@ -84,7 +83,7 @@ def load_settings(path: Path | None = None) -> Settings:
     target = path or get_default_settings_path()
     if not target.exists():
         return Settings()
-    with open(target, "r", encoding="utf-8") as f:
+    with open(target, encoding="utf-8") as f:
         data = yaml.safe_load(f) or {}
     return Settings(**data)
 
@@ -115,9 +114,7 @@ def get_llm_api_key_status(config: LLMConfig) -> LLMApiKeyStatus:
     ready = resolve_llm_api_key(config) is not None
     setup_hint = None
     if not ready:
-        setup_hint = (
-            f"Set {config.api_key_env} in the local shell before starting autostrategy."
-        )
+        setup_hint = f"Set {config.api_key_env} in the local shell before starting autostrategy."
     return LLMApiKeyStatus(
         ready=ready,
         missing_api_key=not ready,

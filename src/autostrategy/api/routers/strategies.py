@@ -23,7 +23,9 @@ def list_templates(service: StrategyService = Depends(get_strategy_service)) -> 
 
 
 @router.get("/strategies", response_model=list[StrategyResponse])
-def list_strategies(service: StrategyService = Depends(get_strategy_service)) -> list[StrategyResponse]:
+def list_strategies(
+    service: StrategyService = Depends(get_strategy_service),
+) -> list[StrategyResponse]:
     """List strategies in the workspace."""
     return [StrategyResponse(**strategy.model_dump()) for strategy in service.list_strategies()]
 

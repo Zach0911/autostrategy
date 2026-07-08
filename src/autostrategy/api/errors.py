@@ -34,9 +34,7 @@ def register_error_handlers(app: FastAPI) -> None:
     """Register API exception handlers."""
 
     @app.exception_handler(AutostrategyServiceError)
-    async def handle_service_error(
-        request: Request, exc: AutostrategyServiceError
-    ) -> JSONResponse:
+    async def handle_service_error(request: Request, exc: AutostrategyServiceError) -> JSONResponse:
         status_code = 500
         for error_type, mapped_status in _ERROR_STATUS.items():
             if isinstance(exc, error_type):

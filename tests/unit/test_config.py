@@ -2,8 +2,6 @@
 
 from pathlib import Path
 
-import pytest
-
 from autostrategy.config import Settings, get_settings_dir, load_settings, save_settings
 
 

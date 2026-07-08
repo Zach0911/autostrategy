@@ -18,7 +18,9 @@ from autostrategy.services.strategy_service import StrategyService
 class DesignService:
     """Application service for natural-language strategy design."""
 
-    def __init__(self, workspace_root: Path | None = None, llm_config: LLMConfig | None = None) -> None:
+    def __init__(
+        self, workspace_root: Path | None = None, llm_config: LLMConfig | None = None
+    ) -> None:
         self.strategy_service = StrategyService(workspace_root=workspace_root)
         self.agent = DesignAgent(llm_config=llm_config)
 

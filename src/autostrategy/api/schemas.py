@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from typing import Any, Literal
 from urllib.parse import urlparse
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from autostrategy.core.strategy import StrategyStatus
 
 _ALLOWED_LLM_API_KEY_ENVS = {
     "AUTOSTRATEGY_LLM_API_KEY",
@@ -31,9 +33,7 @@ _ALLOWED_LLM_BASE_URL_HOSTS = {
     "localhost",
     "127.0.0.1",
 }
-_LLM_ENV_NAME_PATTERN = __import__("re").compile(r"^[A-Z][A-Z0-9_]*$")
-
-from autostrategy.core.strategy import StrategyStatus
+_LLM_ENV_NAME_PATTERN = re.compile(r"^[A-Z][A-Z0-9_]*$")
 
 
 class ErrorBody(BaseModel):
@@ -106,7 +106,9 @@ class LLMConfigUpdateRequest(BaseModel):
     def validate_api_key_env(cls, value: str) -> str:
         """Allow only known API key environment variable names."""
         if not _LLM_ENV_NAME_PATTERN.fullmatch(value):
-            raise ValueError("API key environment variable must be uppercase letters, numbers, and underscores.")
+            raise ValueError(
+                "API key environment variable must be uppercase letters, numbers, and underscores."
+            )
         if value not in _ALLOWED_LLM_API_KEY_ENVS:
             raise ValueError("API key environment variable is not in the allowed provider list.")
         return value

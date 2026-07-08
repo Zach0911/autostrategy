@@ -18,7 +18,11 @@ def _job_response(job: BacktestJob) -> BacktestJobResponse:
     return BacktestJobResponse(**job.model_dump())
 
 
-@router.post("/strategies/{slug}/backtest", response_model=BacktestJobResponse, status_code=status.HTTP_202_ACCEPTED)
+@router.post(
+    "/strategies/{slug}/backtest",
+    response_model=BacktestJobResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
 def run_backtest(
     slug: str,
     response: Response,

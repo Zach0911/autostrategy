@@ -19,7 +19,9 @@ from autostrategy.services.strategy_service import StrategyService
 class CodegenService:
     """Application service for generating executable strategy files."""
 
-    def __init__(self, workspace_root: Path | None = None, llm_config: LLMConfig | None = None) -> None:
+    def __init__(
+        self, workspace_root: Path | None = None, llm_config: LLMConfig | None = None
+    ) -> None:
         self.strategy_service = StrategyService(workspace_root=workspace_root)
         self.agent = CodegenAgent(llm_config=llm_config)
 

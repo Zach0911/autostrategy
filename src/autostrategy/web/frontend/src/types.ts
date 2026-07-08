@@ -66,10 +66,46 @@ export interface BacktestJobResponse {
   stop_requested?: boolean
 }
 
+export interface PaperPosition {
+  symbol: string
+  quantity: number
+  avg_price: number
+  market_price?: number
+  market_value: number
+  realized_pnl?: number
+  unrealized_pnl: number
+}
+
+export interface PaperAccount {
+  initial_cash: number
+  cash: number
+  equity: number
+  final_value: number
+  realized_pnl: number
+  unrealized_pnl: number
+  positions: PaperPosition[]
+  position_count: number
+  trade_count: number
+  rejected_count?: number
+}
+
+export interface PaperFeedMeta {
+  source: string
+  format: string
+  bar_count: number
+  symbols: string[]
+  symbol_count: number
+  start?: string | null
+  end?: string | null
+}
+
 export interface PaperRunResponse {
   strategy: Strategy
   result_path: string
-  result: Record<string, any>
+  result: Record<string, any> & {
+    account?: PaperAccount
+    feed?: PaperFeedMeta | null
+  }
 }
 
 export interface AppInfo {

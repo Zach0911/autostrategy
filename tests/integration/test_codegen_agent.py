@@ -13,7 +13,7 @@ class FakeLLMClient:
         self.config = config
 
     def chat(self, messages, **kwargs):
-        return '''
+        return """
 === FILE: strategy.py ===
 ```python
 def run_backtest(config: dict) -> dict:
@@ -72,7 +72,7 @@ numpy
 def fetch(config: dict):
     return None
 ```
-'''
+"""
 
 
 def test_codegen_agent_generates_files(tmp_path, monkeypatch):
@@ -81,7 +81,12 @@ def test_codegen_agent_generates_files(tmp_path, monkeypatch):
     workspace.write_text_file(
         strategy.slug,
         "STRATEGY_DESIGN.md",
-        "# 双均线策略\n\n## 策略概述\n\n基于均线交叉。\n\n## 买入条件\n\n- 金叉\n\n## 卖出条件\n\n- 死叉\n\n## 止损\n\n- 5% 止损\n\n## 仓位管理\n\n- 满仓\n",
+        "# 双均线策略\n\n"
+        "## 策略概述\n\n基于均线交叉。\n\n"
+        "## 买入条件\n\n- 金叉\n\n"
+        "## 卖出条件\n\n- 死叉\n\n"
+        "## 止损\n\n- 5% 止损\n\n"
+        "## 仓位管理\n\n- 满仓\n",
     )
 
     agent = CodegenAgent(llm_config=LLMConfig())
@@ -101,7 +106,14 @@ def test_codegen_rejects_dangerous_python_patterns():
     agent = CodegenAgent(llm_config=LLMConfig())
     files = {
         "strategy.py": "import subprocess\n\ndef run_backtest(config):\n    return {}\n",
-        "config.yaml": "initial_cash: 1000000\nstart_date: '2024-01-01'\nend_date: '2024-12-31'\ncommission: 0.0003\nslippage: 0.001\nmarket: A股\n",
+        "config.yaml": (
+            "initial_cash: 1000000\n"
+            "start_date: '2024-01-01'\n"
+            "end_date: '2024-12-31'\n"
+            "commission: 0.0003\n"
+            "slippage: 0.001\n"
+            "market: A股\n"
+        ),
         "README.md": "# Demo\n\n## 策略概述\n\nDemo\n",
         "requirements.txt": "pandas\nnumpy\n",
         "data/fetch_data.py": "def fetch(config):\n    return None\n",
