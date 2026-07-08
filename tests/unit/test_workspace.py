@@ -1,7 +1,5 @@
 """Tests for workspace management."""
 
-import pytest
-
 from autostrategy.core.workspace import Workspace
 
 

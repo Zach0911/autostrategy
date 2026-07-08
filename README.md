@@ -196,7 +196,27 @@ paper_run/results/paper_run_events.jsonl
 paper_run/logs/paper_run.log
 ```
 
-当前模拟运行是 replay-first，本地重放历史数据和策略决策。它还不是实盘交易，也不连接真实 broker。
+当前模拟运行是 replay-first，本地重放历史数据和策略决策。它会维护虚拟账户状态，包括现金、权益、持仓、已实现盈亏和未实现盈亏。它还不是实盘交易，也不连接真实 broker。
+
+如果要让 replay 使用统一的本地行情，可以在策略 `config.yaml` 中配置 mock feed：
+
+```yaml
+initial_cash: 1000000
+paper_feed:
+  path: data/bars.csv
+  symbols: ["000001.SZ"]
+  start: "2024-01-01"
+  end: "2024-12-31"
+```
+
+CSV 至少包含：
+
+```text
+at,symbol,open,high,low,close,volume
+2024-01-02,000001.SZ,10,10.5,9.8,10.2,123456
+```
+
+`run_paper(config)` 可以作为 generator 接收每个 bar，并 yield buy/sell/hold 决策事件。
 
 ## 工作流
 

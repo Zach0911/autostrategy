@@ -20,8 +20,9 @@ def compute_atr(high: pd.Series, low: pd.Series, close: pd.Series, period: int) 
     return tr.rolling(window=period).mean()
 
 
-def compute_grid_lines(base_price: float, atr_value: float,
-                       grid_multiplier: float, grid_levels: int) -> list[float]:
+def compute_grid_lines(
+    base_price: float, atr_value: float, grid_multiplier: float, grid_levels: int
+) -> list[float]:
     """指标 4: 网格线序列 — GridLine(i) = Base + i × GridStep"""
     grid_step = atr_value * grid_multiplier
     lines = []
@@ -61,7 +62,7 @@ def run_backtest(config: dict) -> dict:
     data_dir = None
     try:
         from pathlib import Path
-        import os
+
         # 尝试从 data/ 目录加载 CSV
         strategy_dir = Path(__file__).parent
         data_dir = strategy_dir / "data"
@@ -79,7 +80,8 @@ def run_backtest(config: dict) -> dict:
         else:
             # 生成模拟数据用于演示
             all_data[code] = _generate_mock_data(
-                code, config.get("start_date", "2024-01-01"),
+                code,
+                config.get("start_date", "2024-01-01"),
                 config.get("end_date", "2025-12-31"),
                 sym_conf.get("market", "A股"),
             )
@@ -127,8 +129,6 @@ def run_backtest(config: dict) -> dict:
 
             row = df.loc[date]
             close_price = float(row["close"])
-            high_price = float(row["high"])
-            low_price = float(row["low"])
             open_price = float(row["open"])
 
             # ── 极端行情检测（规则 6）──
@@ -156,19 +156,21 @@ def run_backtest(config: dict) -> dict:
                 continue
 
             gs = grid_state[code]
-            need_rebalance = (
-                gs["last_rebalance"] is None
-                or (gs["last_rebalance"] is not None and (date - gs["last_rebalance"]).days >= rebalance_days)
+            need_rebalance = gs["last_rebalance"] is None or (
+                gs["last_rebalance"] is not None
+                and (date - gs["last_rebalance"]).days >= rebalance_days
             )
             if need_rebalance:
-                slice_df = df.iloc[:loc + 1]
+                slice_df = df.iloc[: loc + 1]
                 base_price = float(slice_df["close"].tail(ma_period).mean())
-                atr_val = float(compute_atr(
-                    slice_df["high"].tail(atr_period + 1),
-                    slice_df["low"].tail(atr_period + 1),
-                    slice_df["close"].tail(atr_period + 1),
-                    atr_period,
-                ).iloc[-1])
+                atr_val = float(
+                    compute_atr(
+                        slice_df["high"].tail(atr_period + 1),
+                        slice_df["low"].tail(atr_period + 1),
+                        slice_df["close"].tail(atr_period + 1),
+                        atr_period,
+                    ).iloc[-1]
+                )
                 gs["lines"] = compute_grid_lines(base_price, atr_val, grid_multiplier, grid_levels)
                 gs["last_rebalance"] = date
 
@@ -181,12 +183,9 @@ def run_backtest(config: dict) -> dict:
             # ── 涨跌停检查（A股）──
             prev_close = float(df.iloc[loc - 1]["close"]) if loc > 0 else close_price
             at_limit_up = False
-            at_limit_down = False
             if price_limit_pct and prev_close > 0:
                 limit_up = prev_close * (1 + price_limit_pct / 100)
-                limit_down = prev_close * (1 - price_limit_pct / 100)
                 at_limit_up = close_price >= limit_up * 0.99
-                at_limit_down = close_price <= limit_down * 1.01
 
             # ── 卖出信号（优先于买入，信号优先级规则 1）──
             grids_to_sell = []
@@ -205,7 +204,11 @@ def run_backtest(config: dict) -> dict:
                     continue
 
                 # 条件1: 价格突破上一条网格线
-                sell_target = pos["cost_price"] + (grid_lines[1] - grid_lines[0]) if len(grid_lines) > 1 else pos["cost_price"] * 1.02
+                sell_target = (
+                    pos["cost_price"] + (grid_lines[1] - grid_lines[0])
+                    if len(grid_lines) > 1
+                    else pos["cost_price"] * 1.02
+                )
                 if close_price >= sell_target:
                     grids_to_sell.append((grid_key, "网格盈利"))
                     continue
@@ -220,25 +223,37 @@ def run_backtest(config: dict) -> dict:
                 commission_cost = sell_amount * sym_commission
                 stamp_cost = sell_amount * sym_stamp_tax
                 cash += sell_amount - commission_cost - stamp_cost
-                pnl = (sell_price - pos["cost_price"]) * pos["shares"] - commission_cost - stamp_cost
+                pnl = (
+                    (sell_price - pos["cost_price"]) * pos["shares"] - commission_cost - stamp_cost
+                )
                 if pnl < 0:
                     consecutive_loss_count += 1
                 else:
                     consecutive_loss_count = 0
-                trades.append({
-                    "date": str(date.date()) if hasattr(date, "date") else str(date),
-                    "symbol": code, "name": name, "action": "SELL",
-                    "price": round(sell_price, 2), "shares": pos["shares"],
-                    "reason": reason, "pnl": round(pnl, 2),
-                })
+                trades.append(
+                    {
+                        "date": str(date.date()) if hasattr(date, "date") else str(date),
+                        "symbol": code,
+                        "name": name,
+                        "action": "SELL",
+                        "price": round(sell_price, 2),
+                        "shares": pos["shares"],
+                        "reason": reason,
+                        "pnl": round(pnl, 2),
+                    }
+                )
 
             # ── 买入信号 ──
             if not at_limit_up:  # 不在涨停板时触发
                 # 降仓检查（连续亏损）
-                position_multiplier = 0.5 if consecutive_loss_count >= risk.get("max_loss_grids", 3) else 1.0
+                position_multiplier = (
+                    0.5 if consecutive_loss_count >= risk.get("max_loss_grids", 3) else 1.0
+                )
                 # 总仓位检查（条件3）
                 current_total_position = sum(
-                    p["shares"] * close_price for sym_positions in positions.values() for p in sym_positions.values()
+                    p["shares"] * close_price
+                    for sym_positions in positions.values()
+                    for p in sym_positions.values()
                 )
                 total_value = cash + current_total_position
 
@@ -250,7 +265,9 @@ def run_backtest(config: dict) -> dict:
                             continue  # 条件2: 同网格线不重复建仓
 
                         # 条件1: 价格跌破网格线
-                        prev_close_val = float(df.iloc[loc - 1]["close"]) if loc > 0 else close_price
+                        prev_close_val = (
+                            float(df.iloc[loc - 1]["close"]) if loc > 0 else close_price
+                        )
                         if prev_close_val >= grid_price and close_price < grid_price:
                             invest = min(single_invest, cash)
                             if invest <= 0:
@@ -265,8 +282,15 @@ def run_backtest(config: dict) -> dict:
                             current_sym_value = sum(
                                 p["shares"] * close_price for p in positions[code].values()
                             )
-                            if (current_sym_value + shares * buy_price) / total_value > max_position_pct:
-                                max_shares = int(total_value * max_position_pct * 0.95 / buy_price / lot_size) * lot_size
+                            if (
+                                current_sym_value + shares * buy_price
+                            ) / total_value > max_position_pct:
+                                max_shares = (
+                                    int(
+                                        total_value * max_position_pct * 0.95 / buy_price / lot_size
+                                    )
+                                    * lot_size
+                                )
                                 shares = min(shares, max_shares)
                             if shares <= 0:
                                 continue
@@ -281,12 +305,20 @@ def run_backtest(config: dict) -> dict:
                             }
                             if t_plus_1:
                                 last_buy_date[code] = date
-                            trades.append({
-                                "date": str(date.date()) if hasattr(date, "date") else str(date),
-                                "symbol": code, "name": name, "action": "BUY",
-                                "price": round(buy_price, 2), "shares": shares,
-                                "reason": f"网格线{i} ({grid_price:.2f})", "pnl": 0,
-                            })
+                            trades.append(
+                                {
+                                    "date": str(date.date())
+                                    if hasattr(date, "date")
+                                    else str(date),
+                                    "symbol": code,
+                                    "name": name,
+                                    "action": "BUY",
+                                    "price": round(buy_price, 2),
+                                    "shares": shares,
+                                    "reason": f"网格线{i} ({grid_price:.2f})",
+                                    "pnl": 0,
+                                }
+                            )
 
         # ── 记录每日净值 ──
         total_pos_val = 0
@@ -297,10 +329,12 @@ def run_backtest(config: dict) -> dict:
                 close_p = float(df.loc[date]["close"])
                 for pos in positions[code].values():
                     total_pos_val += pos["shares"] * close_p
-        daily_values.append({
-            "date": str(date.date()) if hasattr(date, "date") else str(date),
-            "value": round(cash + total_pos_val, 2),
-        })
+        daily_values.append(
+            {
+                "date": str(date.date()) if hasattr(date, "date") else str(date),
+                "value": round(cash + total_pos_val, 2),
+            }
+        )
 
     # ── 计算回测指标 ──
     return _compute_metrics(daily_values, trades, initial_cash)
@@ -313,21 +347,27 @@ def _generate_mock_data(code: str, start: str, end: str, market: str) -> pd.Data
 
     # 不同标的的起始价格和波动率
     price_map = {
-        "0700.HK": (350.0, 0.02), "588000.SH": (0.95, 0.015),
-        "563300.SH": (2.5, 0.012), "9868.HK": (45.0, 0.03), "TSLA": (240.0, 0.025),
+        "0700.HK": (350.0, 0.02),
+        "588000.SH": (0.95, 0.015),
+        "563300.SH": (2.5, 0.012),
+        "9868.HK": (45.0, 0.03),
+        "TSLA": (240.0, 0.025),
     }
     base_price, vol = price_map.get(code, (100.0, 0.02))
 
     returns = np.random.normal(0, vol, len(dates))
     prices = base_price * np.cumprod(1 + returns)
 
-    df = pd.DataFrame({
-        "open": prices * (1 + np.random.uniform(-0.005, 0.005, len(dates))),
-        "high": prices * (1 + np.abs(np.random.normal(0, vol * 0.5, len(dates)))),
-        "low": prices * (1 - np.abs(np.random.normal(0, vol * 0.5, len(dates)))),
-        "close": prices,
-        "volume": np.random.randint(1000000, 50000000, len(dates)),
-    }, index=dates)
+    df = pd.DataFrame(
+        {
+            "open": prices * (1 + np.random.uniform(-0.005, 0.005, len(dates))),
+            "high": prices * (1 + np.abs(np.random.normal(0, vol * 0.5, len(dates)))),
+            "low": prices * (1 - np.abs(np.random.normal(0, vol * 0.5, len(dates)))),
+            "close": prices,
+            "volume": np.random.randint(1000000, 50000000, len(dates)),
+        },
+        index=dates,
+    )
     df.index.name = "date"
     return df
 
@@ -357,7 +397,11 @@ def _compute_metrics(daily_values: list, trades: list, initial_cash: float) -> d
             max_dd = dd
 
     # 夏普比率（日收益率 → 年化）
-    daily_returns = [(values[i] - values[i-1]) / values[i-1] for i in range(1, len(values)) if values[i-1] > 0]
+    daily_returns = [
+        (values[i] - values[i - 1]) / values[i - 1]
+        for i in range(1, len(values))
+        if values[i - 1] > 0
+    ]
     if daily_returns:
         avg_daily = np.mean(daily_returns)
         std_daily = np.std(daily_returns)
@@ -395,13 +439,20 @@ def _compute_metrics(daily_values: list, trades: list, initial_cash: float) -> d
         "loss_trades": len(losses),
         "first_half_return": round(first_half, 2),
         "second_half_return": round(second_half, 2),
-        "period_returns": [round(daily_returns[i] * 100, 2) for i in range(0, len(daily_returns), max(1, len(daily_returns) // 10))],
+        "period_returns": [
+            round(daily_returns[i] * 100, 2)
+            for i in range(0, len(daily_returns), max(1, len(daily_returns) // 10))
+        ],
     }
 
 
 def _empty_result() -> dict:
     return {
-        "annual_return": 0, "max_drawdown": 0, "sharpe": 0,
-        "win_rate": 0, "profit_loss_ratio": 0, "total_trades": 0,
+        "annual_return": 0,
+        "max_drawdown": 0,
+        "sharpe": 0,
+        "win_rate": 0,
+        "profit_loss_ratio": 0,
+        "total_trades": 0,
         "error": "无可用数据",
     }

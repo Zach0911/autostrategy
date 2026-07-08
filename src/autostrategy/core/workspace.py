@@ -10,7 +10,6 @@ import yaml
 from autostrategy.core.strategy import Strategy, StrategyStatus
 from autostrategy.core.template_registry import TemplateRegistry
 
-
 DEFAULT_WORKSPACE_ROOT = Path.home() / ".autostrategy" / "strategies"
 
 
@@ -100,7 +99,7 @@ class Workspace:
         meta_path = strategy_dir / "strategy.yaml"
         if not meta_path.exists():
             return None
-        with open(meta_path, "r", encoding="utf-8") as f:
+        with open(meta_path, encoding="utf-8") as f:
             data = yaml.safe_load(f) or {}
         return Strategy(**data)
 

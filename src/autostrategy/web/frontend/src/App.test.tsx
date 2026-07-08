@@ -228,6 +228,26 @@ test('shows submitted paper run status', async () => {
           run_status: 'completed',
           replay: { current_at: '2024-01-02', bars_processed: 1, progress: 1 },
           summary: { paper_return: 1, paper_max_drawdown: 0.5, trade_count: 1, final_value: 1010000 },
+          account: {
+            initial_cash: 1000000,
+            cash: 999000,
+            equity: 1010000,
+            final_value: 1010000,
+            realized_pnl: 0,
+            unrealized_pnl: 11000,
+            positions: [{ symbol: '000001.SZ', quantity: 100, avg_price: 10, market_value: 1010000, unrealized_pnl: 11000 }],
+            position_count: 1,
+            trade_count: 1,
+          },
+          feed: {
+            source: '/tmp/bars.csv',
+            format: 'csv',
+            bar_count: 2,
+            symbols: ['000001.SZ'],
+            symbol_count: 1,
+            start: '2024-01-02',
+            end: '2024-01-03',
+          },
           latest_decision: { action: 'buy', reason: 'signal' },
         },
       })
@@ -262,6 +282,9 @@ test('shows submitted paper run status', async () => {
   expect(await screen.findByText('模拟运行摘要')).toBeInTheDocument()
   await user.click(await screen.findByText('启动模拟运行'))
   expect(await screen.findByText('模拟运行任务：running')).toBeInTheDocument()
+  expect(await screen.findByText('现金')).toBeInTheDocument()
+  expect(await screen.findByText('000001.SZ')).toBeInTheDocument()
+  expect(await screen.findByText('/tmp/bars.csv')).toBeInTheDocument()
 })
 
 test('refreshes paper run result while job is running', async () => {
@@ -286,6 +309,17 @@ test('refreshes paper run result while job is running', async () => {
           run_status: 'running',
           replay: { current_at: '2024-01-03', bars_processed: 2, progress: 0.5 },
           summary: { paper_return: 0, paper_max_drawdown: 0, trade_count: 1, final_value: 1000000 },
+          account: {
+            initial_cash: 1000000,
+            cash: 999900,
+            equity: 1000000,
+            final_value: 1000000,
+            realized_pnl: 0,
+            unrealized_pnl: 100,
+            positions: [{ symbol: '000001.SZ', quantity: 10, avg_price: 10, market_value: 1000, unrealized_pnl: 100 }],
+            position_count: 1,
+            trade_count: 1,
+          },
           latest_decision: { action: 'hold', reason: 'waiting' },
         },
       })

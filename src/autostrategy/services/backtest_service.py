@@ -28,7 +28,9 @@ class BacktestService:
 
         result = run_backtest_workflow(strategy_dir)
         if "error" in result:
-            raise BacktestServiceError(str(result["error"]), details={"score": result.get("score", 0)})
+            raise BacktestServiceError(
+                str(result["error"]), details={"score": result.get("score", 0)}
+            )
 
         self.strategy_service.workspace.update_strategy_status(slug, StrategyStatus.BACKTESTED)
         return self._build_backtest_result(slug, result)

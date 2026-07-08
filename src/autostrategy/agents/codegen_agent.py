@@ -13,7 +13,6 @@ from autostrategy.core.strategy import Strategy, StrategyStatus
 from autostrategy.core.workspace import Workspace
 from autostrategy.llm.client import ChatMessage, LLMClient
 
-
 ALLOWED_GENERATED_FILES = {
     "strategy.py",
     "config.yaml",
@@ -98,11 +97,13 @@ class CodegenAgent:
         return updated
 
     def _build_user_prompt(self, design_text: str, market: str) -> str:
-        return "\n".join([
-            f"目标市场：{market}",
-            "请严格根据以下 STRATEGY_DESIGN.md 生成文件：",
-            design_text,
-        ])
+        return "\n".join(
+            [
+                f"目标市场：{market}",
+                "请严格根据以下 STRATEGY_DESIGN.md 生成文件：",
+                design_text,
+            ]
+        )
 
     def _parse_generated_files(self, text: str) -> dict[str, str]:
         """Parse LLM output into a filename -> content mapping."""
@@ -128,7 +129,9 @@ class CodegenAgent:
             errors.append(f"Missing generated file: {relative_path}")
 
         self._check_python_code_safety(files.get("strategy.py", ""), "strategy.py", errors)
-        self._check_python_code_safety(files.get("data/fetch_data.py", ""), "data/fetch_data.py", errors)
+        self._check_python_code_safety(
+            files.get("data/fetch_data.py", ""), "data/fetch_data.py", errors
+        )
 
         strategy_py = files.get("strategy.py", "")
         if strategy_py:
@@ -139,7 +142,9 @@ class CodegenAgent:
             if "def run_backtest(" not in strategy_py and "class Strategy" not in strategy_py:
                 errors.append("strategy.py must expose run_backtest(config) or Strategy class.")
             if "def run_backtest(" not in strategy_py:
-                warnings.append("strategy.py does not expose the recommended run_backtest(config) API.")
+                warnings.append(
+                    "strategy.py does not expose the recommended run_backtest(config) API."
+                )
 
         config_yaml = files.get("config.yaml", "")
         if config_yaml:

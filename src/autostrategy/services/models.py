@@ -22,7 +22,7 @@ class StrategySummary(BaseModel):
     tags: list[str] = Field(default_factory=list)
 
     @classmethod
-    def from_strategy(cls, strategy: Strategy) -> "StrategySummary":
+    def from_strategy(cls, strategy: Strategy) -> StrategySummary:
         """Build a summary from a domain strategy model."""
         return cls(
             name=strategy.name,
